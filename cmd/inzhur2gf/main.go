@@ -11,6 +11,8 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+
+	"github.com/blobor/ghostfolio-inzhur/internal/state"
 )
 
 // version is set at build time with -ldflags "-X main.version=...".
@@ -43,6 +45,18 @@ func run(ctx context.Context, logger *slog.Logger, getenv func(string) string) e
 		"data_dir", cfg.DataDir,
 		"dry_run", cfg.DryRun,
 	)
+
+	store, err := state.Open(cfg.DataDir)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = store.Close() }()
+
+	_, source, err := store.Token(cfg.InzhurRefreshToken)
+	if err != nil {
+		return err
+	}
+	logger.Info("refresh token selected", "source", source)
 
 	return errNotImplemented
 }

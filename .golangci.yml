@@ -8,17 +8,16 @@ linters:
     - gocritic
     - gosec
     - misspell
+    - nolintlint
     - noctx
     - revive
     - unconvert
     - unparam
-
   settings:
-    gosec:
-      excludes:
-        # Names of environment variables look like credentials to this rule.
-        # Gitleaks examines the repository for real secrets.
-        - G101
+    nolintlint:
+      # Each nolint comment must name the linter and give the reason.
+      require-specific: true
+      require-explanation: true
 
 formatters:
   enable:

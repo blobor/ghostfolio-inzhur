@@ -10,9 +10,9 @@ import (
 
 // Names of the environment variables.
 const (
-	envInzhurRefreshToken    = "INZHUR_REFRESH_TOKEN"
+	envInzhurRefreshToken    = "INZHUR_REFRESH_TOKEN" //nolint:gosec // G101: Name of a variable, not a value.
 	envGhostfolioURL         = "GHOSTFOLIO_URL"
-	envGhostfolioAccessToken = "GHOSTFOLIO_ACCESS_TOKEN"
+	envGhostfolioAccessToken = "GHOSTFOLIO_ACCESS_TOKEN" //nolint:gosec // G101: Name of a variable, not a value.
 	envGhostfolioAccountID   = "GHOSTFOLIO_ACCOUNT_ID"
 	envDataDir               = "DATA_DIR"
 	envSymbolMap             = "SYMBOL_MAP"
