@@ -97,8 +97,10 @@ func TestImport(t *testing.T) {
 			t.Errorf("request body:\n got %s\nwant %s", body, want)
 		}
 
+		// Ghostfolio stored the first activity. It does not return the
+		// second activity, which is a duplicate.
 		w.WriteHeader(http.StatusCreated)
-		_, _ = w.Write([]byte(`{"activities":[{"id":"a"},{"id":"b","error":{"code":"IS_DUPLICATE"}}]}`))
+		_, _ = w.Write([]byte(`{"activities":[{"id":"a"}]}`))
 	})
 	_, client := newFakeServer(t, mux)
 
@@ -117,7 +119,7 @@ func TestImportDryRun(t *testing.T) {
 		if got := r.URL.Query().Get("dryRun"); got != "true" {
 			t.Errorf("dryRun = %q, want true", got)
 		}
-		_, _ = w.Write([]byte(`{"activities":[{},{}]}`))
+		_, _ = w.Write([]byte(`{"activities":[{},{"error":{"code":"IS_DUPLICATE"}}]}`))
 	})
 	_, client := newFakeServer(t, mux)
 
@@ -125,8 +127,38 @@ func TestImportDryRun(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Import() error = %v", err)
 	}
-	if want := (ImportResult{Imported: 2}); result != want {
+	if want := (ImportResult{Imported: 1, Duplicates: 1}); result != want {
 		t.Errorf("Import() = %+v, want %+v", result, want)
+	}
+}
+
+func TestImportOfOnlyDuplicatesReturnsNoActivities(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("POST /api/v1/import", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(`{"activities":[]}`))
+	})
+	_, client := newFakeServer(t, mux)
+
+	result, err := client.Import(context.Background(), testActivities(), false)
+	if err != nil {
+		t.Fatalf("Import() error = %v", err)
+	}
+	if want := (ImportResult{Duplicates: 2}); result != want {
+		t.Errorf("Import() = %+v, want %+v", result, want)
+	}
+}
+
+func TestDryRunMustReturnAllActivities(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("POST /api/v1/import", func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{"activities":[{}]}`))
+	})
+	_, client := newFakeServer(t, mux)
+
+	_, err := client.Import(context.Background(), testActivities(), true)
+	if err == nil || !strings.Contains(err.Error(), "dry run returned 1 activities, want 2") {
+		t.Fatalf("Import() error = %v, want an error about the number of activities", err)
 	}
 }
 
@@ -152,7 +184,9 @@ func TestImportErrors(t *testing.T) {
 			`{"error":"Bad Request","message":["activities.0.symbol (\"X\") is not valid"]}`, "is not valid"},
 		{"unknown error code", http.StatusCreated,
 			`{"activities":[{},{"error":{"code":"IS_BROKEN"}}]}`, "IS_BROKEN"},
-		{"wrong number of activities", http.StatusCreated, `{"activities":[{}]}`, "returned 1 activities, want 2"},
+		{"too many activities", http.StatusCreated, `{"activities":[{},{},{}]}`, "returned 3 activities"},
+		{"duplicate in the result of an import", http.StatusCreated,
+			`{"activities":[{},{"error":{"code":"IS_DUPLICATE"}}]}`, "1 duplicates"},
 		{"not JSON", http.StatusCreated, `<html>`, "decode response"},
 	}
 

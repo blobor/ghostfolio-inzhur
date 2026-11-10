@@ -144,9 +144,24 @@ func (c *Client) Import(ctx context.Context, activities []Activity, dryRun bool)
 			return ImportResult{}, fmt.Errorf("ghostfolio: import returned the unknown error code %q", a.Error.Code)
 		}
 	}
-	if got := result.Imported + result.Duplicates; got != len(activities) {
-		return ImportResult{}, fmt.Errorf("ghostfolio: import returned %d activities, want %d", got, len(activities))
+
+	returned := len(response.Activities)
+	if dryRun {
+		// A dry run returns all activities. A duplicate has an error code.
+		if returned != len(activities) {
+			return ImportResult{}, fmt.Errorf("ghostfolio: dry run returned %d activities, want %d",
+				returned, len(activities))
+		}
+		return result, nil
 	}
+
+	// An import returns only the activities that it stored. It does not
+	// return the duplicates.
+	if result.Duplicates > 0 || returned > len(activities) {
+		return ImportResult{}, fmt.Errorf("ghostfolio: import returned %d activities (%d duplicates) for %d that were sent",
+			returned, result.Duplicates, len(activities))
+	}
+	result.Duplicates = len(activities) - returned
 	return result, nil
 }
 
