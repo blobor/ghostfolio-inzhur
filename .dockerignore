@@ -1,0 +1,8 @@
+# Send only the source code to the builder.
+*
+!go.mod
+!go.sum
+!cmd/
+!inzhur/
+!ghostfolio/
+!internal/

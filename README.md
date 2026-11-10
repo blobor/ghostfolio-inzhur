@@ -158,6 +158,25 @@ set -a; . ./.env; set +a
 ./inzhur2gf
 ```
 
+The program builds for Linux and macOS. It does not build for Windows.
+
+### Container image
+
+The image `ghcr.io/blobor/ghostfolio-inzhur` is for `linux/amd64` and `linux/arm64`.
+It runs as a user that is not root. `DATA_DIR` is `/data` in the image.
+
+```sh
+docker run --rm --env-file .env -v inzhur2gf-data:/data ghcr.io/blobor/ghostfolio-inzhur:edge
+```
+
+Do not set `DATA_DIR` in the `.env` file for the container. If you set it, the value must
+be a directory on the volume.
+
+| Tag | Content |
+|---|---|
+| `edge` | Last commit on `main`. |
+| `1.2.3`, `1.2`, `latest` | Release `v1.2.3`. |
+
 Use a scheduler for regular syncs, for example cron or a Kubernetes CronJob. Make sure that
 two runs do not occur at the same time.
 
