@@ -73,7 +73,13 @@ These steps are for Firefox:
 4. Press F12.
 5. Open **Storage** → **Cookies** → `https://api.inzhur.reit`.
 6. Copy the value of `refreshToken`.
-7. Close the window. Do not use the logout button, because a logout stops the session.
+7. Close the window immediately. Do not use the logout button, because a logout stops the
+   session.
+
+> [!WARNING]
+> Use the token only in one place. The open cabinet page also refreshes the session, and
+> each refresh makes the previous token invalid. Thus a token from a window that stays open
+> stops working after a short time.
 
 Set the value as `INZHUR_REFRESH_TOKEN`.
 

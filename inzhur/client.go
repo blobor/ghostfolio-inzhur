@@ -118,7 +118,10 @@ func (c *Client) Refresh(ctx context.Context, refreshToken string) (Session, err
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
+	// Inzhur answers 401 for a refresh token that is not valid. A different
+	// status, for example 403 from a firewall, is not a problem of the
+	// session.
+	if resp.StatusCode == http.StatusUnauthorized {
 		return Session{}, ErrSessionExpired
 	}
 	if resp.StatusCode != http.StatusOK {

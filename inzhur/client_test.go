@@ -102,7 +102,7 @@ func TestRefreshErrors(t *testing.T) {
 		wantStatus  int
 	}{
 		{name: "unauthorized", status: http.StatusUnauthorized, body: `{}`, wantExpired: true},
-		{name: "forbidden", status: http.StatusForbidden, body: `{}`, wantExpired: true},
+		{name: "forbidden", status: http.StatusForbidden, body: "blocked", wantStatus: http.StatusForbidden},
 		{name: "server error", status: http.StatusBadGateway, body: "bad gateway", wantStatus: http.StatusBadGateway},
 		{name: "no access token", status: http.StatusOK, body: `{}`},
 		{name: "not JSON", status: http.StatusOK, body: `<html>`},
