@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"maps"
 	"math"
 	"slices"
 	"strings"
@@ -104,16 +105,42 @@ func (s *syncer) run(ctx context.Context) error {
 	)
 
 	switch {
-	case s.cfg.DryRun:
-		s.logger.Info("quantities not compared, because this is a dry run")
 	case result.Pending > 0:
 		s.logger.Info("quantities not compared, because some transactions are pending")
+	case s.cfg.DryRun:
+		// A dry run stores nothing, thus Ghostfolio has no quantities to
+		// compare. Use the quantities that the activities give.
+		s.compare(transactions, holdings, quantities(result.Activities), "activities")
 	default:
-		if err := s.compare(ctx, transactions, holdings); err != nil {
-			return err
+		gfHoldings, err := s.ghostfolio.Holdings(ctx)
+		if err != nil {
+			return fmt.Errorf("read ghostfolio holdings: %w", err)
 		}
+		inGhostfolio := make(map[string]float64)
+		for _, h := range gfHoldings {
+			if h.DataSource == ghostfolio.DataSourceManual {
+				inGhostfolio[h.Symbol] += h.Quantity
+			}
+		}
+		s.compare(transactions, holdings, inGhostfolio, "ghostfolio")
 	}
 	return nil
+}
+
+// quantities returns the quantity of each symbol after all activities.
+func quantities(activities []ghostfolio.Activity) map[string]float64 {
+	result := make(map[string]float64)
+	for _, a := range activities {
+		switch a.Type {
+		case ghostfolio.TypeBuy:
+			result[a.Symbol] += a.Quantity
+		case ghostfolio.TypeSell:
+			result[a.Symbol] -= a.Quantity
+		case ghostfolio.TypeDividend:
+			// A dividend does not change the quantity.
+		}
+	}
+	return result
 }
 
 // refresh gets an access token and saves the new refresh token.
@@ -170,21 +197,12 @@ func (s *syncer) checkSymbols(ctx context.Context, activities []ghostfolio.Activ
 	return nil
 }
 
-// compare writes a warning for each asset whose quantity in Ghostfolio is
-// different from the quantity in Inzhur.
-func (s *syncer) compare(ctx context.Context, transactions []inzhur.Transaction, holdings []inzhur.Holding) error {
-	gfHoldings, err := s.ghostfolio.Holdings(ctx)
-	if err != nil {
-		return fmt.Errorf("read ghostfolio holdings: %w", err)
-	}
-
-	inGhostfolio := make(map[string]float64)
-	for _, h := range gfHoldings {
-		if h.DataSource == ghostfolio.DataSourceManual {
-			inGhostfolio[h.Symbol] += h.Quantity
-		}
-	}
-
+// compare writes a warning for each asset whose quantity is different
+// from the quantity in Inzhur. The source tells where the quantities come
+// from: the activities of this sync, or Ghostfolio.
+func (s *syncer) compare(transactions []inzhur.Transaction, holdings []inzhur.Holding,
+	got map[string]float64, source string,
+) {
 	// The holdings of Inzhur have only the asset ID. The transactions have
 	// the name or the ISIN, which the symbol needs.
 	assets := make(map[int]inzhur.Asset)
@@ -195,6 +213,7 @@ func (s *syncer) compare(ctx context.Context, transactions []inzhur.Transaction,
 	}
 
 	differences := 0
+	compared := make(map[string]bool)
 	for _, h := range holdings {
 		asset, ok := assets[h.AssetID]
 		if !ok {
@@ -207,15 +226,32 @@ func (s *syncer) compare(ctx context.Context, transactions []inzhur.Transaction,
 			continue
 		}
 
-		if got := inGhostfolio[symbol]; math.Abs(got-h.Quantity) > quantityTolerance {
+		compared[symbol] = true
+		if quantity := got[symbol]; math.Abs(quantity-h.Quantity) > quantityTolerance {
 			s.logger.Warn("quantity is different",
-				"symbol", symbol, "inzhur", h.Quantity, "ghostfolio", got)
+				"symbol", symbol, "inzhur", h.Quantity, source, quantity)
+			differences++
+		}
+	}
+
+	// An asset that is in the history but not in the holdings of Inzhur
+	// was sold completely. Its quantity must be 0.
+	sold := 0
+	for _, id := range slices.Sorted(maps.Keys(assets)) {
+		symbol, err := mapper.Symbol(assets[id], s.cfg.SymbolMap)
+		if err != nil || compared[symbol] {
+			continue
+		}
+		compared[symbol] = true
+		sold++
+		if quantity := got[symbol]; math.Abs(quantity) > quantityTolerance {
+			s.logger.Warn("quantity is different",
+				"symbol", symbol, "inzhur", 0, source, quantity)
 			differences++
 		}
 	}
 
 	if differences == 0 {
-		s.logger.Info("quantities are equal", "assets", len(holdings))
+		s.logger.Info("quantities are equal", "assets", len(holdings), "sold_assets", sold, "source", source)
 	}
-	return nil
 }

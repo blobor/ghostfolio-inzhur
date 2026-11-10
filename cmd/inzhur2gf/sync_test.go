@@ -182,7 +182,7 @@ func TestSyncUsesStoredToken(t *testing.T) {
 
 func TestSyncDryRun(t *testing.T) {
 	f := baseFakes()
-	s, _ := newSyncer(f, true)
+	s, log := newSyncer(f, true)
 
 	if err := s.run(context.Background()); err != nil {
 		t.Fatalf("run() error = %v", err)
@@ -191,11 +191,52 @@ func TestSyncDryRun(t *testing.T) {
 		t.Error("the import was not a dry run")
 	}
 	if slices.Contains(f.calls, "gf-holdings") {
-		t.Error("the sync compared the quantities in a dry run")
+		t.Error("the dry run read the holdings of Ghostfolio")
+	}
+	if !strings.Contains(log.String(), "quantities are equal") || !strings.Contains(log.String(), "source=activities") {
+		t.Errorf("log does not report equal quantities from the activities:\n%s", log)
 	}
 	// A dry run uses the refresh token, thus it must save the new one.
 	if !slices.Contains(f.calls, "save:start+1") {
 		t.Error("the dry run did not save the new refresh token")
+	}
+}
+
+func TestSyncDryRunWarnsWhenTheHistoryIsNotComplete(t *testing.T) {
+	f := baseFakes()
+	f.holdings[0].Quantity = 20
+	s, log := newSyncer(f, true)
+
+	if err := s.run(context.Background()); err != nil {
+		t.Fatalf("run() error = %v", err)
+	}
+	for _, want := range []string{"level=WARN", "symbol=GF_INZHUR-REIT", "inzhur=20", "activities=15"} {
+		if !strings.Contains(log.String(), want) {
+			t.Errorf("log does not contain %q:\n%s", want, log)
+		}
+	}
+}
+
+func TestSyncWarnsWhenASoldAssetHasAQuantity(t *testing.T) {
+	f := baseFakes()
+	// The history has a purchase of a bond, but Inzhur has no holding of it.
+	f.transactions = append(f.transactions, inzhur.Transaction{
+		ID:        1000,
+		Amount:    204494,
+		Type:      inzhur.TypePurchase,
+		CreatedAt: syncTime.Add(-96 * time.Hour),
+		Asset:     &inzhur.Asset{ID: 36, Type: inzhur.AssetBond, ISIN: "UA4000238976"},
+		Contract:  &inzhur.Contract{ID: 1000, Quantity: 2, PricePerUnit: 1022.47},
+	})
+	s, log := newSyncer(f, true)
+
+	if err := s.run(context.Background()); err != nil {
+		t.Fatalf("run() error = %v", err)
+	}
+	for _, want := range []string{"level=WARN", "symbol=GF_UA4000238976", "inzhur=0", "activities=2"} {
+		if !strings.Contains(log.String(), want) {
+			t.Errorf("log does not contain %q:\n%s", want, log)
+		}
 	}
 }
 

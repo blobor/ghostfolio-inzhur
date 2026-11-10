@@ -180,8 +180,9 @@ func TestHoldings(t *testing.T) {
 			t.Errorf("Authorization header = %q, want Bearer auth-1", got)
 		}
 		_, _ = w.Write([]byte(`{"holdings":[
-			{"symbol":"GF_INZHUR-REIT","dataSource":"MANUAL","quantity":10,"name":"Inzhur REIT"},
-			{"symbol":"VWCE.DE","dataSource":"YAHOO","quantity":1.5}
+			{"quantity":10,"activitiesCount":2,"assetProfile":{"symbol":"GF_INZHUR-REIT","dataSource":"MANUAL","currency":"UAH"}},
+			{"quantity":0,"activitiesCount":5,"assetProfile":{"symbol":"GF_UA4000239016","dataSource":"MANUAL"}},
+			{"quantity":1.5,"assetProfile":{"symbol":"VWCE.DE","dataSource":"YAHOO"}}
 		]}`))
 	})
 	_, client := newFakeServer(t, mux)
@@ -193,6 +194,7 @@ func TestHoldings(t *testing.T) {
 
 	want := []Holding{
 		{Symbol: "GF_INZHUR-REIT", DataSource: "MANUAL", Quantity: 10},
+		{Symbol: "GF_UA4000239016", DataSource: "MANUAL", Quantity: 0},
 		{Symbol: "VWCE.DE", DataSource: "YAHOO", Quantity: 1.5},
 	}
 	if len(got) != len(want) {
@@ -202,6 +204,19 @@ func TestHoldings(t *testing.T) {
 		if got[i] != want[i] {
 			t.Errorf("Holdings()[%d] = %+v, want %+v", i, got[i], want[i])
 		}
+	}
+}
+
+func TestHoldingsRejectsAHoldingWithoutSymbol(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /api/v1/portfolio/holdings", func(w http.ResponseWriter, _ *http.Request) {
+		// This is the format of an older Ghostfolio version.
+		_, _ = w.Write([]byte(`{"holdings":[{"symbol":"GF_INZHUR-REIT","dataSource":"MANUAL","quantity":10}]}`))
+	})
+	_, client := newFakeServer(t, mux)
+
+	if _, err := client.Holdings(context.Background()); err == nil {
+		t.Fatal("Holdings() error = nil, want an error")
 	}
 }
 
