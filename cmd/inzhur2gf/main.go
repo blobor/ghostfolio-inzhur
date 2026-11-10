@@ -21,17 +21,17 @@ var errNotImplemented = errors.New("sync is not implemented yet")
 func main() {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
-
-	if err := run(ctx, logger, os.Getenv); err != nil {
+	if err := run(context.Background(), logger, os.Getenv); err != nil {
 		logger.Error("sync failed", "error", err)
-		stop()
 		os.Exit(1)
 	}
 }
 
-func run(_ context.Context, logger *slog.Logger, getenv func(string) string) error {
+func run(ctx context.Context, logger *slog.Logger, getenv func(string) string) error {
+	// The context is not used until the sync is implemented.
+	_, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
 	cfg, err := loadConfig(getenv)
 	if err != nil {
 		return err

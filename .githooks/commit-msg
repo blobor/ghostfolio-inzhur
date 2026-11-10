@@ -1,0 +1,24 @@
+#!/bin/sh
+# Makes sure that the first line of the commit message obeys
+# Conventional Commits 1.0.0: <type>[(scope)][!]: <description>
+set -eu
+
+subject=$(head -n 1 "$1")
+
+case "$subject" in
+    Merge\ *|Revert\ *|fixup!\ *|squash!\ *) exit 0 ;;
+esac
+
+pattern='^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test)(\([a-z0-9-]+\))?!?: [^ ].*[^.]$'
+
+if ! printf '%s\n' "$subject" | grep -Eq "$pattern"; then
+    echo "commit-msg: the first line must obey Conventional Commits." >&2
+    echo "  Example: feat(mapper): map dividend tax to a fee" >&2
+    echo "  Types: build chore ci docs feat fix perf refactor revert style test" >&2
+    exit 1
+fi
+
+if [ "${#subject}" -gt 72 ]; then
+    echo "commit-msg: the first line must have 72 characters or fewer." >&2
+    exit 1
+fi
