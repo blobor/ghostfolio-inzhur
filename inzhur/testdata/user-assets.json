@@ -1,0 +1,48 @@
+{
+  "assets": [
+    {
+      "id": 21,
+      "type": "fund",
+      "prices": {
+        "buy": 11.6468, "sell": 11.6178, "nav": 11.6178,
+        "buyUAH": 11.6468, "sellUAH": 11.6178, "navUAH": 11.6178,
+        "buyUSD": 0.256987, "sellUSD": 0.256347, "navUSD": 0.256347
+      },
+      "userSettings": {"distributionPreferenceMode": "REINVEST", "dividendAction": "Keep"},
+      "details": {
+        "certificatesOwnedQuantity": 10,
+        "certificatesSaleRestrictedQuantity": 3,
+        "investedUAH": 11618,
+        "investedUSD": 256,
+        "totalAmountUAH": 11618,
+        "totalAmountUSD": 256,
+        "distributionsAccruedAmountUAH": 1000,
+        "distributionsAccruedAmountUSD": 22,
+        "distributionsExpectedMonthlyAmountUSD": 1,
+        "distributionsExpectedMonthlyAmountUAH": 50
+      }
+    },
+    {
+      "id": 36,
+      "type": "bond",
+      "prices": {
+        "buy": 1022.47, "sell": 1022.47, "nav": 0,
+        "buyUAH": 1022.47, "sellUAH": 1022.47, "navUAH": 0,
+        "buyUSD": 22.515266, "sellUSD": 22.515266, "navUSD": 0
+      },
+      "userSettings": {"distributionPreferenceMode": "BROKER", "dividendAction": "Keep"},
+      "details": {
+        "certificatesOwnedQuantity": 4,
+        "certificatesSaleRestrictedQuantity": 0,
+        "investedUAH": 408988,
+        "investedUSD": 9000,
+        "totalAmountUAH": 408988,
+        "totalAmountUSD": 9000,
+        "distributionsAccruedAmountUAH": 0,
+        "distributionsAccruedAmountUSD": 0,
+        "distributionsExpectedMonthlyAmountUSD": null,
+        "distributionsExpectedMonthlyAmountUAH": null
+      }
+    }
+  ]
+}

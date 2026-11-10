@@ -1,0 +1,72 @@
+[
+  {
+    "id": 1005,
+    "amount": 204494,
+    "type": "Sale",
+    "distributionType": null,
+    "externalCreatedAt": "2026-01-15T07:08:35.000Z",
+    "asset": {"id": 36, "isin": "UA4000238976", "name": null, "type": "bond"},
+    "contract": {
+      "id": 505,
+      "externalCreatedAt": "2026-01-15T07:03:15.933Z",
+      "number": "15/01/26-00005",
+      "quantity": 2,
+      "amountUAH": 204494,
+      "amountUSD": 4500,
+      "buyerReportId": null,
+      "sellerReportId": "9005",
+      "pricePerUnit": 1022.47
+    },
+    "bankAccount": null
+  },
+  {
+    "id": 1004,
+    "amount": 50000,
+    "type": "Withdrawal",
+    "distributionType": null,
+    "externalCreatedAt": "2026-01-14T10:12:00.000Z",
+    "asset": null,
+    "contract": null,
+    "bankAccount": {"iban": "UA000000000000000000000000000", "name": "Example", "bankInfo": "Example Bank"}
+  },
+  {
+    "id": 1003,
+    "amount": 180,
+    "type": "Dividend tax",
+    "distributionType": "DIVIDEND",
+    "externalCreatedAt": "2026-01-10T22:19:01.000Z",
+    "asset": {"id": 21, "isin": null, "name": "Inzhur REIT", "type": "fund"},
+    "contract": null,
+    "bankAccount": null
+  },
+  {
+    "id": 1002,
+    "amount": 1000,
+    "type": "Dividend crediting",
+    "distributionType": "DIVIDEND",
+    "externalCreatedAt": "2026-01-10T22:19:00.000Z",
+    "asset": {"id": 21, "isin": null, "name": "Inzhur REIT", "type": "fund"},
+    "contract": null,
+    "bankAccount": null
+  },
+  {
+    "id": 1001,
+    "amount": 11618,
+    "type": "Purchase",
+    "distributionType": null,
+    "externalCreatedAt": "2026-01-05T02:34:38.000Z",
+    "asset": {"id": 21, "isin": null, "name": "Inzhur REIT", "type": "fund"},
+    "contract": {
+      "id": 501,
+      "externalCreatedAt": "2026-01-05T02:36:12.903Z",
+      "number": "05/01/26-00001",
+      "quantity": 10,
+      "amountUAH": 11618,
+      "amountUSD": 256,
+      "buyerReportId": "9001",
+      "sellerReportId": null,
+      "pricePerUnit": 11.6178
+    },
+    "bankAccount": null
+  }
+]
