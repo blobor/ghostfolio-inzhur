@@ -6,8 +6,8 @@ self-hosted [Ghostfolio](https://ghostfol.io).
 The binary is `inzhur2gf`. It does one sync and stops. A scheduler starts it again.
 
 > [!WARNING]
-> **Status: work in progress.** The command reads its configuration and stops with an error.
-> The sync is not implemented yet. This document describes the design of version 1.
+> **Status: early version.** The sync is implemented, but it has no release yet.
+> Do the first sync with `DRY_RUN=true`.
 
 ## Disclaimer
 
@@ -34,6 +34,7 @@ sequenceDiagram
     T->>D: save the new refresh token
     T->>I: read all transactions and holdings
     T->>T: convert transactions to activities
+    T->>G: make sure that the asset profiles exist
     T->>G: import the activities
     G-->>T: result (Ghostfolio skips known activities)
     T->>T: compare quantities with the Inzhur holdings
@@ -88,11 +89,11 @@ new value.
 2. Make an account for Inzhur with the currency `UAH`. Its ID is `GHOSTFOLIO_ACCOUNT_ID`.
 3. Make an asset profile with the data source `MANUAL` for each Inzhur asset that you hold.
    Use the symbols from [Symbols](#symbols).
-4. Make an access token with these scopes: `activity:create`, `activity:read`,
-   `account:read`, `portfolio:read`. Its value is `GHOSTFOLIO_ACCESS_TOKEN`.
+4. Get the security token of your Ghostfolio user. This is the token that you use to log
+   in. Its value is `GHOSTFOLIO_ACCESS_TOKEN`.
 
-The program does not use the security token of your Ghostfolio user. An access token with
-scopes gives the program only the permissions that it needs.
+> [!CAUTION]
+> The security token gives full access to your Ghostfolio user. Keep it in a secret store.
 
 ## Configuration
 
@@ -103,11 +104,11 @@ The program reads its configuration from environment variables. See
 |---|---|---|
 | `INZHUR_REFRESH_TOKEN` | Yes | Start token from your browser session. |
 | `GHOSTFOLIO_URL` | Yes | Base URL of your Ghostfolio instance, for example `http://ghostfolio:3333`. |
-| `GHOSTFOLIO_ACCESS_TOKEN` | Yes | Ghostfolio access token with scopes. |
+| `GHOSTFOLIO_ACCESS_TOKEN` | Yes | Security token of your Ghostfolio user. |
 | `GHOSTFOLIO_ACCOUNT_ID` | Yes | Ghostfolio account that receives the activities. |
 | `DATA_DIR` | Yes | Directory for the current refresh token. |
 | `SYMBOL_MAP` | No | Ghostfolio symbol for an Inzhur asset ID. See [Symbols](#symbols). |
-| `DRY_RUN` | No | `true`: do all steps, but send nothing to Ghostfolio. |
+| `DRY_RUN` | No | `true`: Ghostfolio examines the activities, but stores nothing. |
 
 If a value is missing or incorrect, the program reports all problems and exits with code 1.
 

@@ -6,19 +6,19 @@ package main
 
 import (
 	"context"
-	"errors"
 	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
+	"github.com/blobor/ghostfolio-inzhur/ghostfolio"
 	"github.com/blobor/ghostfolio-inzhur/internal/state"
+	"github.com/blobor/ghostfolio-inzhur/inzhur"
 )
 
 // version is set at build time with -ldflags "-X main.version=...".
 var version = "dev"
-
-var errNotImplemented = errors.New("sync is not implemented yet")
 
 func main() {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
@@ -30,8 +30,7 @@ func main() {
 }
 
 func run(ctx context.Context, logger *slog.Logger, getenv func(string) string) error {
-	// The context is not used until the sync is implemented.
-	_, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
+	ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
 	cfg, err := loadConfig(getenv)
@@ -52,11 +51,18 @@ func run(ctx context.Context, logger *slog.Logger, getenv func(string) string) e
 	}
 	defer func() { _ = store.Close() }()
 
-	_, source, err := store.Token(cfg.InzhurRefreshToken)
+	gf, err := ghostfolio.NewClient(cfg.GhostfolioURL.String(), cfg.GhostfolioAccessToken)
 	if err != nil {
 		return err
 	}
-	logger.Info("refresh token selected", "source", source)
 
-	return errNotImplemented
+	s := &syncer{
+		cfg:        cfg,
+		logger:     logger,
+		inzhur:     inzhur.NewClient(),
+		ghostfolio: gf,
+		store:      store,
+		now:        time.Now,
+	}
+	return s.run(ctx)
 }

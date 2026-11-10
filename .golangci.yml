@@ -18,6 +18,13 @@ linters:
       # Each nolint comment must name the linter and give the reason.
       require-specific: true
       require-explanation: true
+  exclusions:
+    rules:
+      # A fake in a test must have the signature of the interface, also
+      # when it always returns a nil error.
+      - path: _test\.go
+        linters:
+          - unparam
 
 formatters:
   enable:
