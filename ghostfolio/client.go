@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -163,6 +164,92 @@ func (c *Client) Import(ctx context.Context, activities []Activity, dryRun bool)
 	}
 	result.Duplicates = len(activities) - returned
 	return result, nil
+}
+
+// activitiesPageSize is the number of activities in one request.
+const activitiesPageSize = 500
+
+// StoredActivity is an activity that Ghostfolio has.
+type StoredActivity struct {
+	// ID is the ID of the activity in Ghostfolio.
+	ID string
+	Activity
+}
+
+// Activities returns all activities of one account.
+func (c *Client) Activities(ctx context.Context, accountID string) ([]StoredActivity, error) {
+	if accountID == "" {
+		return nil, errors.New("ghostfolio: account ID is empty")
+	}
+
+	var stored []StoredActivity
+	for {
+		query := url.Values{}
+		query.Set("accounts", accountID)
+		query.Set("take", strconv.Itoa(activitiesPageSize))
+		query.Set("skip", strconv.Itoa(len(stored)))
+
+		var response struct {
+			Count      int `json:"count"`
+			Activities []struct {
+				ID           string       `json:"id"`
+				AccountID    string       `json:"accountId"`
+				Comment      string       `json:"comment"`
+				Date         time.Time    `json:"date"`
+				Fee          float64      `json:"fee"`
+				Quantity     float64      `json:"quantity"`
+				Type         ActivityType `json:"type"`
+				UnitPrice    float64      `json:"unitPrice"`
+				AssetProfile struct {
+					Symbol     string `json:"symbol"`
+					DataSource string `json:"dataSource"`
+					Currency   string `json:"currency"`
+				} `json:"assetProfile"`
+			} `json:"activities"`
+		}
+		if err := c.call(ctx, http.MethodGet, "/api/v1/activities?"+query.Encode(), nil, &response); err != nil {
+			return nil, err
+		}
+
+		for _, a := range response.Activities {
+			stored = append(stored, StoredActivity{
+				ID: a.ID,
+				Activity: Activity{
+					AccountID:  a.AccountID,
+					Comment:    a.Comment,
+					Currency:   a.AssetProfile.Currency,
+					DataSource: a.AssetProfile.DataSource,
+					Date:       a.Date,
+					Fee:        a.Fee,
+					Quantity:   a.Quantity,
+					Symbol:     a.AssetProfile.Symbol,
+					Type:       a.Type,
+					UnitPrice:  a.UnitPrice,
+				},
+			})
+		}
+
+		if len(stored) >= response.Count {
+			return stored, nil
+		}
+		if len(response.Activities) == 0 {
+			return nil, fmt.Errorf("ghostfolio: read %d activities, but the account has %d", len(stored), response.Count)
+		}
+	}
+}
+
+// Update replaces the values of the activity with the given ID.
+func (c *Client) Update(ctx context.Context, id string, activity Activity) error {
+	if id == "" {
+		return errors.New("ghostfolio: activity ID is empty")
+	}
+
+	request := struct {
+		ID string `json:"id"`
+		Activity
+	}{ID: id, Activity: activity}
+
+	return c.call(ctx, http.MethodPut, "/api/v1/activities/"+url.PathEscape(id), request, nil)
 }
 
 // Holding is the current position in one symbol.

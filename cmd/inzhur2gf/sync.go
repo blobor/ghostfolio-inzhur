@@ -36,8 +36,10 @@ type inzhurAPI interface {
 
 // ghostfolioAPI is the part of the Ghostfolio client that the sync uses.
 type ghostfolioAPI interface {
+	Activities(ctx context.Context, accountID string) ([]ghostfolio.StoredActivity, error)
 	HasSymbol(ctx context.Context, dataSource, symbol string) (bool, error)
 	Import(ctx context.Context, activities []ghostfolio.Activity, dryRun bool) (ghostfolio.ImportResult, error)
+	Update(ctx context.Context, id string, activity ghostfolio.Activity) error
 	Holdings(ctx context.Context) ([]ghostfolio.Holding, error)
 }
 
@@ -57,8 +59,8 @@ type syncer struct {
 	now        func() time.Time
 }
 
-// run does one sync: refresh the session, read Inzhur, convert, import
-// into Ghostfolio, then compare the quantities.
+// run does one sync: refresh the session, read Inzhur, convert, make the
+// account in Ghostfolio agree with Inzhur, then compare the quantities.
 func (s *syncer) run(ctx context.Context) error {
 	accessToken, err := s.refresh(ctx)
 	if err != nil {
@@ -90,11 +92,40 @@ func (s *syncer) run(ctx context.Context) error {
 		"pending", result.Pending,
 	)
 
-	if err := s.checkSymbols(ctx, result.Activities); err != nil {
+	stored, err := s.ghostfolio.Activities(ctx, s.cfg.GhostfolioAccountID)
+	if err != nil {
+		return fmt.Errorf("read ghostfolio activities: %w", err)
+	}
+	p := reconcile(result.Activities, stored)
+	if result.Pending > 0 {
+		// A pending transaction is not in the activities, but Ghostfolio
+		// can have it from a sync before its pair came.
+		p.extra = nil
+	}
+	s.logger.Info("activities reconciled",
+		"create", len(p.create),
+		"update", len(p.update),
+		"duplicates", len(p.duplicates),
+		"extra", len(p.extra),
+	)
+	for _, d := range p.duplicates {
+		s.logger.Warn("ghostfolio has more than one activity for a transaction; delete the copies",
+			"comment", d.comment,
+			"ids", strings.Join(d.ids, ","),
+		)
+	}
+	for _, a := range p.extra {
+		s.logger.Warn("ghostfolio has an activity for a transaction that inzhur does not have",
+			"comment", a.Comment,
+			"id", a.ID,
+		)
+	}
+
+	if err := s.checkSymbols(ctx, p.create); err != nil {
 		return err
 	}
 
-	imported, err := s.ghostfolio.Import(ctx, result.Activities, s.cfg.DryRun)
+	imported, err := s.ghostfolio.Import(ctx, p.create, s.cfg.DryRun)
 	if err != nil {
 		return fmt.Errorf("import activities: %w", err)
 	}
@@ -103,6 +134,21 @@ func (s *syncer) run(ctx context.Context) error {
 		"imported", imported.Imported,
 		"duplicates", imported.Duplicates,
 	)
+
+	for _, c := range p.update {
+		if !s.cfg.DryRun {
+			if err := s.ghostfolio.Update(ctx, c.id, c.new); err != nil {
+				return fmt.Errorf("update activity %s: %w", c.new.Comment, err)
+			}
+		}
+		s.logger.Info("activity updated",
+			"dry_run", s.cfg.DryRun,
+			"comment", c.new.Comment,
+			"id", c.id,
+			"old", describe(c.old),
+			"new", describe(c.new),
+		)
+	}
 
 	switch {
 	case result.Pending > 0:

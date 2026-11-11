@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"maps"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -204,6 +206,153 @@ func TestImportErrors(t *testing.T) {
 				t.Fatalf("Import() error = %v, want it to contain %q", err, tt.want)
 			}
 		})
+	}
+}
+
+func TestActivitiesReadsAllPages(t *testing.T) {
+	const total = activitiesPageSize + 2
+
+	var requests []string
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /api/v1/activities", func(w http.ResponseWriter, r *http.Request) {
+		requests = append(requests, r.URL.RawQuery)
+		if got := r.URL.Query().Get("accounts"); got != "account-1" {
+			t.Errorf("accounts = %q, want account-1", got)
+		}
+
+		skip, _ := strconv.Atoi(r.URL.Query().Get("skip"))
+		take, _ := strconv.Atoi(r.URL.Query().Get("take"))
+
+		type profile struct {
+			Symbol     string `json:"symbol"`
+			DataSource string `json:"dataSource"`
+			Currency   string `json:"currency"`
+		}
+		type item struct {
+			ID           string  `json:"id"`
+			AccountID    string  `json:"accountId"`
+			Comment      string  `json:"comment"`
+			Date         string  `json:"date"`
+			Fee          float64 `json:"fee"`
+			Quantity     float64 `json:"quantity"`
+			Type         string  `json:"type"`
+			UnitPrice    float64 `json:"unitPrice"`
+			AssetProfile profile `json:"assetProfile"`
+		}
+		var items []item
+		for i := skip; i < total && i < skip+take; i++ {
+			items = append(items, item{
+				ID:           "id-" + strconv.Itoa(i),
+				AccountID:    "account-1",
+				Comment:      "inzhur:" + strconv.Itoa(1000+i),
+				Date:         "2026-01-05T02:34:38.000Z",
+				Fee:          1.5,
+				Quantity:     10,
+				Type:         "BUY",
+				UnitPrice:    11.6178,
+				AssetProfile: profile{Symbol: "GF_INZHUR-REIT", DataSource: "MANUAL", Currency: "UAH"},
+			})
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"count": total, "activities": items})
+	})
+	_, client := newFakeServer(t, mux)
+
+	got, err := client.Activities(context.Background(), "account-1")
+	if err != nil {
+		t.Fatalf("Activities() error = %v", err)
+	}
+	if len(got) != total || len(requests) != 2 {
+		t.Fatalf("Activities() returned %d records in %d requests, want %d in 2", len(got), len(requests), total)
+	}
+
+	want := StoredActivity{
+		ID: "id-501",
+		Activity: Activity{
+			AccountID:  "account-1",
+			Comment:    "inzhur:1501",
+			Currency:   "UAH",
+			DataSource: DataSourceManual,
+			Date:       time.Date(2026, 1, 5, 2, 34, 38, 0, time.UTC),
+			Fee:        1.5,
+			Quantity:   10,
+			Symbol:     "GF_INZHUR-REIT",
+			Type:       TypeBuy,
+			UnitPrice:  11.6178,
+		},
+	}
+	if last := got[total-1]; last != want {
+		t.Errorf("last activity = %+v, want %+v", last, want)
+	}
+}
+
+func TestActivitiesOfAnEmptyAccount(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /api/v1/activities", func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{"activities":[],"count":0}`))
+	})
+	_, client := newFakeServer(t, mux)
+
+	got, err := client.Activities(context.Background(), "account-1")
+	if err != nil || len(got) != 0 {
+		t.Fatalf("Activities() = %v, %v; want no activities and no error", got, err)
+	}
+}
+
+func TestUpdate(t *testing.T) {
+	var body map[string]any
+	mux := http.NewServeMux()
+	mux.HandleFunc("PUT /api/v1/activities/id-1", func(w http.ResponseWriter, r *http.Request) {
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Errorf("decode request: %v", err)
+		}
+		_, _ = w.Write([]byte(`{"id":"id-1"}`))
+	})
+	_, client := newFakeServer(t, mux)
+
+	activity := Activity{
+		AccountID:  "account-1",
+		Comment:    "inzhur:1001",
+		Currency:   "UAH",
+		DataSource: DataSourceManual,
+		Date:       time.Date(2026, 1, 5, 22, 0, 0, 0, time.UTC),
+		Fee:        1.5,
+		Quantity:   10,
+		Symbol:     "GF_INZHUR-REIT",
+		Type:       TypeBuy,
+		UnitPrice:  11.6178,
+	}
+	if err := client.Update(context.Background(), "id-1", activity); err != nil {
+		t.Fatalf("Update() error = %v", err)
+	}
+
+	want := map[string]any{
+		"id":         "id-1",
+		"accountId":  "account-1",
+		"comment":    "inzhur:1001",
+		"currency":   "UAH",
+		"dataSource": "MANUAL",
+		"date":       "2026-01-05T22:00:00Z",
+		"fee":        1.5,
+		"quantity":   10.0,
+		"symbol":     "GF_INZHUR-REIT",
+		"type":       "BUY",
+		"unitPrice":  11.6178,
+	}
+	if !maps.Equal(body, want) {
+		t.Errorf("request body:\n got %v\nwant %v", body, want)
+	}
+}
+
+func TestUpdateOfAMissingActivityIsAnError(t *testing.T) {
+	_, client := newFakeServer(t, http.NewServeMux())
+
+	err := client.Update(context.Background(), "id-missing", Activity{})
+
+	if statusErr, ok := errors.AsType[*StatusError](err); !ok || statusErr.Status != http.StatusNotFound {
+		t.Errorf("Update() error = %v, want status 404", err)
+	}
+	if err := client.Update(context.Background(), "", Activity{}); err == nil {
+		t.Error("Update() with an empty ID: no error")
 	}
 }
 

@@ -14,9 +14,12 @@ import (
 )
 
 const (
-	currency      = "UAH"
-	symbolPrefix  = "GF_"
-	commentPrefix = "inzhur:"
+	currency     = "UAH"
+	symbolPrefix = "GF_"
+
+	// CommentPrefix starts the comment of each activity. The Inzhur
+	// transaction ID comes after it.
+	CommentPrefix = "inzhur:"
 
 	// taxWindow is the maximum time between a dividend and its tax. In the
 	// data of Inzhur the tax comes one second after the dividend.
@@ -159,7 +162,7 @@ func convert(tx inzhur.Transaction, opts Options) (ghostfolio.Activity, error) {
 
 	activity := ghostfolio.Activity{
 		AccountID:  opts.AccountID,
-		Comment:    fmt.Sprintf("%s%d", commentPrefix, tx.ID),
+		Comment:    fmt.Sprintf("%s%d", CommentPrefix, tx.ID),
 		Currency:   currency,
 		DataSource: ghostfolio.DataSourceManual,
 		Date:       tx.CreatedAt.UTC(),

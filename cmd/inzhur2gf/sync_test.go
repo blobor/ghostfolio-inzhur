@@ -6,6 +6,7 @@ import (
 	"errors"
 	"log/slog"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -27,9 +28,11 @@ type fakes struct {
 	transactions []inzhur.Transaction
 	holdings     []inzhur.Holding
 
+	stored         []ghostfolio.StoredActivity
 	missingSymbols []string
 	imported       []ghostfolio.Activity
 	importDryRun   bool
+	updated        map[string]ghostfolio.Activity
 	gfHoldings     []ghostfolio.Holding
 }
 
@@ -65,6 +68,11 @@ func (f *fakes) inzhurHoldings(_ context.Context, accessToken string) ([]inzhur.
 	return f.holdings, nil
 }
 
+func (f *fakes) Activities(_ context.Context, accountID string) ([]ghostfolio.StoredActivity, error) {
+	f.calls = append(f.calls, "activities:"+accountID)
+	return f.stored, nil
+}
+
 func (f *fakes) HasSymbol(_ context.Context, _, symbol string) (bool, error) {
 	f.calls = append(f.calls, "symbol:"+symbol)
 	return !slices.Contains(f.missingSymbols, symbol), nil
@@ -75,6 +83,15 @@ func (f *fakes) Import(_ context.Context, activities []ghostfolio.Activity, dryR
 	f.imported = activities
 	f.importDryRun = dryRun
 	return ghostfolio.ImportResult{Imported: len(activities)}, nil
+}
+
+func (f *fakes) Update(_ context.Context, id string, activity ghostfolio.Activity) error {
+	f.calls = append(f.calls, "update:"+id)
+	if f.updated == nil {
+		f.updated = make(map[string]ghostfolio.Activity)
+	}
+	f.updated[id] = activity
+	return nil
 }
 
 func (f *fakes) ghostfolioHoldings(_ context.Context) ([]ghostfolio.Holding, error) {
@@ -148,6 +165,7 @@ func TestSync(t *testing.T) {
 		"save:start+1",
 		"transactions:access",
 		"holdings:access",
+		"activities:account-1",
 		"symbol:GF_INZHUR-REIT",
 		"import",
 		"gf-holdings",
@@ -164,6 +182,132 @@ func TestSync(t *testing.T) {
 	}
 	if !strings.Contains(log.String(), "quantities are equal") {
 		t.Errorf("log does not report equal quantities:\n%s", log)
+	}
+}
+
+// afterFirstSync does a sync into an empty account. Then it gives
+// Ghostfolio the activities of that sync, with the IDs gf-1, gf-2 and so
+// on.
+func afterFirstSync(t *testing.T) *fakes {
+	t.Helper()
+
+	f := baseFakes()
+	s, _ := newSyncer(f, false)
+	if err := s.run(context.Background()); err != nil {
+		t.Fatalf("first run() error = %v", err)
+	}
+	for i, a := range f.imported {
+		f.stored = append(f.stored, ghostfolio.StoredActivity{ID: "gf-" + strconv.Itoa(i+1), Activity: a})
+	}
+	f.calls, f.imported = nil, nil
+	return f
+}
+
+func wantLog(t *testing.T, log *bytes.Buffer, parts ...string) {
+	t.Helper()
+	for _, want := range parts {
+		if !strings.Contains(log.String(), want) {
+			t.Errorf("log does not contain %q:\n%s", want, log)
+		}
+	}
+}
+
+func TestSyncCreatesOnlyTransactionsThatGhostfolioDoesNotHave(t *testing.T) {
+	f := afterFirstSync(t)
+	f.stored = f.stored[:1]
+
+	s, log := newSyncer(f, false)
+	if err := s.run(context.Background()); err != nil {
+		t.Fatalf("run() error = %v", err)
+	}
+
+	if len(f.imported) != 1 || f.imported[0].Comment != "inzhur:1002" {
+		t.Errorf("imported = %+v, want only inzhur:1002", f.imported)
+	}
+	if len(f.updated) != 0 {
+		t.Errorf("updated = %+v, want nothing", f.updated)
+	}
+	wantLog(t, log, "create=1", "update=0", "duplicates=0", "extra=0")
+}
+
+func TestSyncUpdatesATransactionThatInzhurChanged(t *testing.T) {
+	f := afterFirstSync(t)
+
+	// Inzhur moves the time of a transaction after the import.
+	moved := f.transactions[0].CreatedAt.Add(19 * time.Hour)
+	f.transactions[0].CreatedAt = moved
+
+	s, log := newSyncer(f, false)
+	if err := s.run(context.Background()); err != nil {
+		t.Fatalf("run() error = %v", err)
+	}
+
+	if len(f.imported) != 0 {
+		t.Errorf("imported %d activities, want 0: %+v", len(f.imported), f.imported)
+	}
+	got, ok := f.updated["gf-2"]
+	if len(f.updated) != 1 || !ok {
+		t.Fatalf("updated = %+v, want only gf-2", f.updated)
+	}
+	if got.Comment != "inzhur:1002" || !got.Date.Equal(moved) || got.AccountID != "account-1" {
+		t.Errorf("updated activity = %+v", got)
+	}
+	wantLog(t, log, "create=0", "update=1", "activity updated", "comment=inzhur:1002", "id=gf-2")
+}
+
+func TestSyncDryRunDoesNotUpdate(t *testing.T) {
+	f := afterFirstSync(t)
+	f.transactions[0].CreatedAt = f.transactions[0].CreatedAt.Add(19 * time.Hour)
+
+	s, log := newSyncer(f, true)
+	if err := s.run(context.Background()); err != nil {
+		t.Fatalf("run() error = %v", err)
+	}
+
+	if len(f.updated) != 0 {
+		t.Errorf("the dry run updated %+v", f.updated)
+	}
+	wantLog(t, log, "update=1", "activity updated", "dry_run=true")
+}
+
+func TestSyncDoesNotUpdateWhenGhostfolioHasTwoActivitiesForOneTransaction(t *testing.T) {
+	f := afterFirstSync(t)
+	moved := f.stored[1]
+	moved.ID = "gf-3"
+	moved.Date = moved.Date.Add(19 * time.Hour)
+	f.stored = append(f.stored, moved)
+
+	s, log := newSyncer(f, false)
+	if err := s.run(context.Background()); err != nil {
+		t.Fatalf("run() error = %v", err)
+	}
+
+	if len(f.imported) != 0 || len(f.updated) != 0 {
+		t.Errorf("imported = %+v, updated = %+v, want nothing", f.imported, f.updated)
+	}
+	wantLog(t, log, "level=WARN", "more than one activity for a transaction",
+		"comment=inzhur:1002", "ids=gf-2,gf-3", "update=0", "duplicates=1")
+}
+
+func TestSyncWarnsAboutAnActivityThatInzhurDoesNotHave(t *testing.T) {
+	f := afterFirstSync(t)
+	gone := f.stored[0]
+	gone.ID, gone.Comment = "gf-9", "inzhur:999"
+	manual := f.stored[0]
+	manual.ID, manual.Comment = "gf-10", "made by hand"
+	f.stored = append(f.stored, gone, manual)
+
+	s, log := newSyncer(f, false)
+	if err := s.run(context.Background()); err != nil {
+		t.Fatalf("run() error = %v", err)
+	}
+
+	if len(f.imported) != 0 || len(f.updated) != 0 {
+		t.Errorf("imported = %+v, updated = %+v, want nothing", f.imported, f.updated)
+	}
+	wantLog(t, log, "extra=1", "level=WARN", "inzhur does not have", "comment=inzhur:999", "id=gf-9")
+	if strings.Contains(log.String(), "gf-10") {
+		t.Errorf("log has an activity that is not from this program:\n%s", log)
 	}
 }
 

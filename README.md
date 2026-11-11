@@ -34,9 +34,11 @@ sequenceDiagram
     T->>D: save the new refresh token
     T->>I: read all transactions and holdings
     T->>T: convert transactions to activities
+    T->>G: read the activities of the account
+    T->>T: compare the two lists by the transaction ID
     T->>G: make sure that the asset profiles exist
-    T->>G: import the activities
-    G-->>T: result (Ghostfolio skips known activities)
+    T->>G: import the activities that are missing
+    T->>G: update the activities that are different
     T->>T: compare quantities with the Inzhur holdings
     T-->>S: exit code 0, or not 0 on an error
 ```
@@ -44,10 +46,16 @@ sequenceDiagram
 Important properties:
 
 - **One item of state.** The program keeps only the current refresh token, in `DATA_DIR`.
-- **Full history on each sync.** Ghostfolio skips an activity that is equal to one it has.
-  Thus a second sync adds nothing.
+- **Full history on each sync.** The program reads all transactions from Inzhur and all
+  activities of the account from Ghostfolio. The Inzhur transaction ID in the comment
+  identifies an activity.
+- **Ghostfolio follows Inzhur.** The program imports a transaction that Ghostfolio does
+  not have. Inzhur can change a transaction after the import, for example its time. The
+  program then updates the activity and writes the old and the new values to the log.
 - **Activities only.** The program does not write market prices.
-- **No automatic deletion.** The program never deletes an activity in Ghostfolio.
+- **No automatic deletion.** The program never deletes an activity in Ghostfolio. It
+  writes a warning if a transaction has two activities, or if Inzhur does not have the
+  transaction of an activity.
 - **Fail closed.** An unknown transaction type stops the import.
 
 ## Requirements
@@ -114,7 +122,7 @@ The program reads its configuration from environment variables. See
 | `GHOSTFOLIO_ACCOUNT_ID` | Yes | Ghostfolio account that receives the activities. |
 | `DATA_DIR` | Yes | Directory for the current refresh token. |
 | `SYMBOL_MAP` | No | Ghostfolio symbol for an Inzhur asset ID. See [Symbols](#symbols). |
-| `DRY_RUN` | No | `true`: Ghostfolio examines the activities, but stores nothing. |
+| `DRY_RUN` | No | `true`: the program reports the changes, but Ghostfolio stores nothing. |
 
 If a value is missing or incorrect, the program reports all problems and exits with code 1.
 
@@ -152,7 +160,12 @@ imports nothing and reports the symbol that it expects.
 
 Each activity has the comment `inzhur:<transaction id>`. The program imports only
 transactions that are older than approximately one hour. Thus a dividend and its tax are
-always imported together.
+usually imported together.
+
+> [!WARNING]
+> Do not change the activities with this comment in Ghostfolio. The program finds an
+> activity by its comment, and it replaces your changes on the next sync. Activities
+> without this comment stay as they are.
 
 ## Build and run
 
