@@ -38,6 +38,8 @@ func fixture(t *testing.T, name string) []byte {
 }
 
 func TestRefresh(t *testing.T) {
+	t.Parallel()
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /auth/auth/refresh", func(w http.ResponseWriter, r *http.Request) {
 		cookie, err := r.Cookie("refreshToken")
@@ -78,6 +80,8 @@ func TestRefresh(t *testing.T) {
 }
 
 func TestRefreshKeepsTokenIfThereIsNoNewCookie(t *testing.T) {
+	t.Parallel()
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /auth/auth/refresh", func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte(`{"accessToken":"access-1"}`))
@@ -94,6 +98,8 @@ func TestRefreshKeepsTokenIfThereIsNoNewCookie(t *testing.T) {
 }
 
 func TestRefreshErrors(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name        string
 		status      int
@@ -110,6 +116,8 @@ func TestRefreshErrors(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			mux := http.NewServeMux()
 			mux.HandleFunc("POST /auth/auth/refresh", func(w http.ResponseWriter, _ *http.Request) {
 				w.WriteHeader(tt.status)
@@ -134,6 +142,8 @@ func TestRefreshErrors(t *testing.T) {
 }
 
 func TestRefreshRejectsEmptyToken(t *testing.T) {
+	t.Parallel()
+
 	client := newTestClient(t, http.NewServeMux())
 
 	if _, err := client.Refresh(t.Context(), ""); err == nil {
@@ -142,6 +152,8 @@ func TestRefreshRejectsEmptyToken(t *testing.T) {
 }
 
 func TestTransactions(t *testing.T) {
+	t.Parallel()
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /core/users/transactions", func(w http.ResponseWriter, r *http.Request) {
 		if got := r.Header.Get("Authorization"); got != "Bearer access-1" {
@@ -195,6 +207,8 @@ func TestTransactions(t *testing.T) {
 }
 
 func TestHoldings(t *testing.T) {
+	t.Parallel()
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /core/user-assets", func(w http.ResponseWriter, r *http.Request) {
 		if got := r.Header.Get("Authorization"); got != "Bearer access-1" {
@@ -225,7 +239,11 @@ func TestHoldings(t *testing.T) {
 }
 
 func TestGetErrors(t *testing.T) {
+	t.Parallel()
+
 	t.Run("unauthorized", func(t *testing.T) {
+		t.Parallel()
+
 		mux := http.NewServeMux()
 		mux.HandleFunc("GET /core/users/transactions", func(w http.ResponseWriter, _ *http.Request) {
 			w.WriteHeader(http.StatusUnauthorized)
@@ -238,6 +256,8 @@ func TestGetErrors(t *testing.T) {
 	})
 
 	t.Run("status error has no query and a short body", func(t *testing.T) {
+		t.Parallel()
+
 		mux := http.NewServeMux()
 		mux.HandleFunc("GET /core/users/transactions", func(w http.ResponseWriter, _ *http.Request) {
 			w.WriteHeader(http.StatusInternalServerError)
@@ -260,6 +280,8 @@ func TestGetErrors(t *testing.T) {
 	})
 
 	t.Run("empty access token", func(t *testing.T) {
+		t.Parallel()
+
 		client := newTestClient(t, http.NewServeMux())
 
 		if _, err := client.Holdings(t.Context(), ""); err == nil {
@@ -268,6 +290,8 @@ func TestGetErrors(t *testing.T) {
 	})
 
 	t.Run("canceled context", func(t *testing.T) {
+		t.Parallel()
+
 		mux := http.NewServeMux()
 		mux.HandleFunc("GET /core/user-assets", func(w http.ResponseWriter, _ *http.Request) {
 			_, _ = w.Write([]byte(`{"assets":[]}`))
@@ -284,6 +308,8 @@ func TestGetErrors(t *testing.T) {
 }
 
 func TestErrorsDoNotContainTokens(t *testing.T) {
+	t.Parallel()
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /auth/auth/refresh", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)

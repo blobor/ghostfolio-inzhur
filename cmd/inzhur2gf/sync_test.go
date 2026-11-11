@@ -152,6 +152,8 @@ func baseFakes() *fakes {
 }
 
 func TestSync(t *testing.T) {
+	t.Parallel()
+
 	f := baseFakes()
 	s, log := newSyncer(f, false)
 
@@ -213,6 +215,8 @@ func wantLog(t *testing.T, log *bytes.Buffer, parts ...string) {
 }
 
 func TestSyncCreatesOnlyTransactionsThatGhostfolioDoesNotHave(t *testing.T) {
+	t.Parallel()
+
 	f := afterFirstSync(t)
 	f.stored = f.stored[:1]
 
@@ -231,6 +235,8 @@ func TestSyncCreatesOnlyTransactionsThatGhostfolioDoesNotHave(t *testing.T) {
 }
 
 func TestSyncUpdatesATransactionThatInzhurChanged(t *testing.T) {
+	t.Parallel()
+
 	f := afterFirstSync(t)
 
 	// Inzhur moves the time of a transaction after the import.
@@ -256,6 +262,8 @@ func TestSyncUpdatesATransactionThatInzhurChanged(t *testing.T) {
 }
 
 func TestSyncDryRunDoesNotUpdate(t *testing.T) {
+	t.Parallel()
+
 	f := afterFirstSync(t)
 	f.transactions[0].CreatedAt = f.transactions[0].CreatedAt.Add(19 * time.Hour)
 
@@ -271,6 +279,8 @@ func TestSyncDryRunDoesNotUpdate(t *testing.T) {
 }
 
 func TestSyncDoesNotUpdateWhenGhostfolioHasTwoActivitiesForOneTransaction(t *testing.T) {
+	t.Parallel()
+
 	f := afterFirstSync(t)
 	moved := f.stored[1]
 	moved.ID = "gf-3"
@@ -290,6 +300,8 @@ func TestSyncDoesNotUpdateWhenGhostfolioHasTwoActivitiesForOneTransaction(t *tes
 }
 
 func TestSyncWarnsAboutAnActivityThatInzhurDoesNotHave(t *testing.T) {
+	t.Parallel()
+
 	f := afterFirstSync(t)
 	gone := f.stored[0]
 	gone.ID, gone.Comment = "gf-9", "inzhur:999"
@@ -312,6 +324,8 @@ func TestSyncWarnsAboutAnActivityThatInzhurDoesNotHave(t *testing.T) {
 }
 
 func TestSyncUsesStoredToken(t *testing.T) {
+	t.Parallel()
+
 	f := baseFakes()
 	f.storedToken = "stored"
 	s, _ := newSyncer(f, false)
@@ -325,6 +339,8 @@ func TestSyncUsesStoredToken(t *testing.T) {
 }
 
 func TestSyncDryRun(t *testing.T) {
+	t.Parallel()
+
 	f := baseFakes()
 	s, log := newSyncer(f, true)
 
@@ -347,6 +363,8 @@ func TestSyncDryRun(t *testing.T) {
 }
 
 func TestSyncDryRunWarnsWhenTheHistoryIsNotComplete(t *testing.T) {
+	t.Parallel()
+
 	f := baseFakes()
 	f.holdings[0].Quantity = 20
 	s, log := newSyncer(f, true)
@@ -362,6 +380,8 @@ func TestSyncDryRunWarnsWhenTheHistoryIsNotComplete(t *testing.T) {
 }
 
 func TestSyncWarnsWhenASoldAssetHasAQuantity(t *testing.T) {
+	t.Parallel()
+
 	f := baseFakes()
 	// The history has a purchase of a bond, but Inzhur has no holding of it.
 	f.transactions = append(f.transactions, inzhur.Transaction{
@@ -385,6 +405,8 @@ func TestSyncWarnsWhenASoldAssetHasAQuantity(t *testing.T) {
 }
 
 func TestSyncStopsWhenSessionIsExpired(t *testing.T) {
+	t.Parallel()
+
 	f := baseFakes()
 	f.refreshErr = inzhur.ErrSessionExpired
 	s, _ := newSyncer(f, false)
@@ -402,6 +424,8 @@ func TestSyncStopsWhenSessionIsExpired(t *testing.T) {
 }
 
 func TestSyncImportsNothingWhenAProfileIsMissing(t *testing.T) {
+	t.Parallel()
+
 	f := baseFakes()
 	f.missingSymbols = []string{"GF_INZHUR-REIT"}
 	s, _ := newSyncer(f, false)
@@ -416,6 +440,8 @@ func TestSyncImportsNothingWhenAProfileIsMissing(t *testing.T) {
 }
 
 func TestSyncImportsNothingWhenATransactionIsNotKnown(t *testing.T) {
+	t.Parallel()
+
 	f := baseFakes()
 	f.transactions = append(f.transactions, inzhur.Transaction{
 		ID: 2000, Type: "Bonus crediting", CreatedAt: syncTime.Add(-24 * time.Hour),
@@ -432,6 +458,8 @@ func TestSyncImportsNothingWhenATransactionIsNotKnown(t *testing.T) {
 }
 
 func TestSyncDoesNotCompareWhenTransactionsArePending(t *testing.T) {
+	t.Parallel()
+
 	f := baseFakes()
 	f.transactions = append(f.transactions, reitPurchase(1003, syncTime.Add(-10*time.Minute), 1))
 	s, log := newSyncer(f, false)
@@ -451,6 +479,8 @@ func TestSyncDoesNotCompareWhenTransactionsArePending(t *testing.T) {
 }
 
 func TestSyncWarnsWhenQuantitiesAreDifferent(t *testing.T) {
+	t.Parallel()
+
 	f := baseFakes()
 	f.gfHoldings[0].Quantity = 14
 	s, log := newSyncer(f, false)

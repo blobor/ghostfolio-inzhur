@@ -79,6 +79,8 @@ func testActivities() []Activity {
 }
 
 func TestImport(t *testing.T) {
+	t.Parallel()
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /api/v1/import", func(w http.ResponseWriter, r *http.Request) {
 		if got := r.Header.Get("Authorization"); got != "Bearer auth-1" {
@@ -115,6 +117,8 @@ func TestImport(t *testing.T) {
 }
 
 func TestImportDryRun(t *testing.T) {
+	t.Parallel()
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /api/v1/import", func(w http.ResponseWriter, r *http.Request) {
 		if got := r.URL.Query().Get("dryRun"); got != "true" {
@@ -134,6 +138,8 @@ func TestImportDryRun(t *testing.T) {
 }
 
 func TestImportOfOnlyDuplicatesReturnsNoActivities(t *testing.T) {
+	t.Parallel()
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /api/v1/import", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusCreated)
@@ -151,6 +157,8 @@ func TestImportOfOnlyDuplicatesReturnsNoActivities(t *testing.T) {
 }
 
 func TestDryRunMustReturnAllActivities(t *testing.T) {
+	t.Parallel()
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /api/v1/import", func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte(`{"activities":[{}]}`))
@@ -164,6 +172,8 @@ func TestDryRunMustReturnAllActivities(t *testing.T) {
 }
 
 func TestImportWithoutActivitiesDoesNoRequest(t *testing.T) {
+	t.Parallel()
+
 	fake, client := newFakeServer(t, http.NewServeMux())
 
 	if _, err := client.Import(t.Context(), nil, false); err != nil {
@@ -175,6 +185,8 @@ func TestImportWithoutActivitiesDoesNoRequest(t *testing.T) {
 }
 
 func TestImportErrors(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name   string
 		status int
@@ -193,6 +205,8 @@ func TestImportErrors(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			mux := http.NewServeMux()
 			mux.HandleFunc("POST /api/v1/import", func(w http.ResponseWriter, _ *http.Request) {
 				w.WriteHeader(tt.status)
@@ -209,6 +223,8 @@ func TestImportErrors(t *testing.T) {
 }
 
 func TestActivitiesReadsAllPages(t *testing.T) {
+	t.Parallel()
+
 	const total = activitiesPageSize + 2
 
 	var requests []string
@@ -285,6 +301,8 @@ func TestActivitiesReadsAllPages(t *testing.T) {
 }
 
 func TestActivitiesOfAnEmptyAccount(t *testing.T) {
+	t.Parallel()
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/v1/activities", func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte(`{"activities":[],"count":0}`))
@@ -298,6 +316,8 @@ func TestActivitiesOfAnEmptyAccount(t *testing.T) {
 }
 
 func TestUpdate(t *testing.T) {
+	t.Parallel()
+
 	var body map[string]any
 	mux := http.NewServeMux()
 	mux.HandleFunc("PUT /api/v1/activities/id-1", func(w http.ResponseWriter, r *http.Request) {
@@ -343,6 +363,8 @@ func TestUpdate(t *testing.T) {
 }
 
 func TestUpdateOfAMissingActivityIsAnError(t *testing.T) {
+	t.Parallel()
+
 	_, client := newFakeServer(t, http.NewServeMux())
 
 	err := client.Update(t.Context(), "id-missing", Activity{})
@@ -356,6 +378,8 @@ func TestUpdateOfAMissingActivityIsAnError(t *testing.T) {
 }
 
 func TestHoldings(t *testing.T) {
+	t.Parallel()
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/v1/portfolio/holdings", func(w http.ResponseWriter, r *http.Request) {
 		if got := r.Header.Get("Authorization"); got != "Bearer auth-1" {
@@ -390,6 +414,8 @@ func TestHoldings(t *testing.T) {
 }
 
 func TestHoldingsRejectsAHoldingWithoutSymbol(t *testing.T) {
+	t.Parallel()
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/v1/portfolio/holdings", func(w http.ResponseWriter, _ *http.Request) {
 		// This is the format of an older Ghostfolio version.
@@ -403,6 +429,8 @@ func TestHoldingsRejectsAHoldingWithoutSymbol(t *testing.T) {
 }
 
 func TestHasSymbol(t *testing.T) {
+	t.Parallel()
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/v1/symbol/MANUAL/GF_INZHUR-REIT", func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte(`{"symbol":"GF_INZHUR-REIT","dataSource":"MANUAL","currency":"UAH"}`))
@@ -423,6 +451,8 @@ func TestHasSymbol(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.symbol, func(t *testing.T) {
+			t.Parallel()
+
 			got, err := client.HasSymbol(t.Context(), DataSourceManual, tt.symbol)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("HasSymbol() error = %v, wantErr %v", err, tt.wantErr)
@@ -435,6 +465,8 @@ func TestHasSymbol(t *testing.T) {
 }
 
 func TestLoginIsDoneOneTime(t *testing.T) {
+	t.Parallel()
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/v1/portfolio/holdings", func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte(`{"holdings":[]}`))
@@ -452,6 +484,8 @@ func TestLoginIsDoneOneTime(t *testing.T) {
 }
 
 func TestLoginIsDoneAgainAfterUnauthorized(t *testing.T) {
+	t.Parallel()
+
 	var calls atomic.Int32
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/v1/portfolio/holdings", func(w http.ResponseWriter, _ *http.Request) {
@@ -472,6 +506,8 @@ func TestLoginIsDoneAgainAfterUnauthorized(t *testing.T) {
 }
 
 func TestUnauthorizedTwoTimesIsAnError(t *testing.T) {
+	t.Parallel()
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/v1/portfolio/holdings", func(w http.ResponseWriter, _ *http.Request) {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -489,6 +525,8 @@ func TestUnauthorizedTwoTimesIsAnError(t *testing.T) {
 }
 
 func TestBadSecurityToken(t *testing.T) {
+	t.Parallel()
+
 	mux := http.NewServeMux()
 	server := httptest.NewServer(mux)
 	t.Cleanup(server.Close)
@@ -511,6 +549,8 @@ func TestBadSecurityToken(t *testing.T) {
 }
 
 func TestNewClientRejectsBadInput(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name    string
 		baseURL string
@@ -523,6 +563,8 @@ func TestNewClientRejectsBadInput(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			if _, err := NewClient(tt.baseURL, tt.token); err == nil {
 				t.Fatal("NewClient() error = nil, want an error")
 			}

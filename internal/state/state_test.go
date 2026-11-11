@@ -34,12 +34,16 @@ func wantToken(t *testing.T, s *Store, startToken, want string, wantSource Sourc
 }
 
 func TestTokenWithoutStateIsStartToken(t *testing.T) {
+	t.Parallel()
+
 	s := open(t, t.TempDir())
 
 	wantToken(t, s, "start-1", "start-1", SourceStart)
 }
 
 func TestTokenAfterSaveIsStoredToken(t *testing.T) {
+	t.Parallel()
+
 	s := open(t, t.TempDir())
 
 	if err := s.Save("rotated-1", "start-1"); err != nil {
@@ -54,6 +58,8 @@ func TestTokenAfterSaveIsStoredToken(t *testing.T) {
 }
 
 func TestNewStartTokenReplacesStoredToken(t *testing.T) {
+	t.Parallel()
+
 	s := open(t, t.TempDir())
 
 	if err := s.Save("rotated-1", "start-1"); err != nil {
@@ -64,6 +70,8 @@ func TestNewStartTokenReplacesStoredToken(t *testing.T) {
 }
 
 func TestStateStaysBetweenRuns(t *testing.T) {
+	t.Parallel()
+
 	dir := t.TempDir()
 
 	first, err := Open(dir)
@@ -82,6 +90,8 @@ func TestStateStaysBetweenRuns(t *testing.T) {
 }
 
 func TestOpenReturnsErrLockedForSecondRun(t *testing.T) {
+	t.Parallel()
+
 	dir := t.TempDir()
 	first := open(t, dir)
 
@@ -96,6 +106,8 @@ func TestOpenReturnsErrLockedForSecondRun(t *testing.T) {
 }
 
 func TestSaveRejectsEmptyToken(t *testing.T) {
+	t.Parallel()
+
 	s := open(t, t.TempDir())
 
 	if err := s.Save("", "start-1"); err == nil {
@@ -104,6 +116,8 @@ func TestSaveRejectsEmptyToken(t *testing.T) {
 }
 
 func TestStateFileIsPrivateAndHasNoStartToken(t *testing.T) {
+	t.Parallel()
+
 	dir := filepath.Join(t.TempDir(), "data")
 	s := open(t, dir)
 
@@ -146,6 +160,8 @@ func TestStateFileIsPrivateAndHasNoStartToken(t *testing.T) {
 }
 
 func TestTokenReportsDamagedStateFile(t *testing.T) {
+	t.Parallel()
+
 	dir := t.TempDir()
 	s := open(t, dir)
 

@@ -21,6 +21,8 @@ func getenvFrom(env map[string]string) func(string) string {
 }
 
 func TestLoadConfig(t *testing.T) {
+	t.Parallel()
+
 	env := validEnv()
 	env[envSymbolMap] = "21=GF_INZHUR-REIT, 36=GF_UA4000238976"
 	env[envDryRun] = "true"
@@ -43,6 +45,8 @@ func TestLoadConfig(t *testing.T) {
 }
 
 func TestLoadConfigDefaults(t *testing.T) {
+	t.Parallel()
+
 	cfg, err := loadConfig(getenvFrom(validEnv()))
 	if err != nil {
 		t.Fatalf("loadConfig() error = %v", err)
@@ -56,6 +60,8 @@ func TestLoadConfigDefaults(t *testing.T) {
 }
 
 func TestLoadConfigReportsAllMissingVariables(t *testing.T) {
+	t.Parallel()
+
 	_, err := loadConfig(getenvFrom(nil))
 	if err == nil {
 		t.Fatal("loadConfig() error = nil, want an error")
@@ -75,6 +81,8 @@ func TestLoadConfigReportsAllMissingVariables(t *testing.T) {
 }
 
 func TestLoadConfigRejectsBadValues(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name  string
 		env   string
@@ -91,6 +99,8 @@ func TestLoadConfigRejectsBadValues(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			env := validEnv()
 			env[tt.env] = tt.value
 

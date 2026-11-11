@@ -97,6 +97,8 @@ func wantActivities(t *testing.T, got, want []ghostfolio.Activity) {
 }
 
 func TestMapAllTypes(t *testing.T) {
+	t.Parallel()
+
 	transactions := []inzhur.Transaction{
 		// The API returns the newest transaction first.
 		trade(1009, inzhur.TypeSaleTax, reit, "2026-01-20T10:00:05Z", 503, 5, 11.7, 195),
@@ -130,6 +132,8 @@ func TestMapAllTypes(t *testing.T) {
 }
 
 func TestMapIsDeterministic(t *testing.T) {
+	t.Parallel()
+
 	transactions := []inzhur.Transaction{
 		cash(1005, inzhur.TypeDividendTax, reit, "2026-01-10T22:19:01Z", 180),
 		cash(1004, inzhur.TypeDividendCrediting, reit, "2026-01-10T22:19:00Z", 1000),
@@ -149,6 +153,8 @@ func TestMapIsDeterministic(t *testing.T) {
 }
 
 func TestMapMatchesEachDividendTaxToItsDividend(t *testing.T) {
+	t.Parallel()
+
 	energy := &inzhur.Asset{ID: 13, Type: inzhur.AssetFund, Name: "Inzhur Energy"}
 	transactions := []inzhur.Transaction{
 		// Two funds pay a dividend in the same second.
@@ -171,6 +177,8 @@ func TestMapMatchesEachDividendTaxToItsDividend(t *testing.T) {
 }
 
 func TestMapHoldsBackYoungTransactions(t *testing.T) {
+	t.Parallel()
+
 	transactions := []inzhur.Transaction{
 		// Younger than one hour.
 		trade(1004, inzhur.TypePurchase, reit, "2026-01-31T23:30:00Z", 502, 1, 11.7, 1170),
@@ -191,6 +199,8 @@ func TestMapHoldsBackYoungTransactions(t *testing.T) {
 }
 
 func TestMapUsesSymbolMap(t *testing.T) {
+	t.Parallel()
+
 	opts := options()
 	opts.SymbolMap = map[int]string{21: "GF_MY-REIT"}
 	transactions := []inzhur.Transaction{
@@ -205,6 +215,8 @@ func TestMapUsesSymbolMap(t *testing.T) {
 }
 
 func TestMapErrors(t *testing.T) {
+	t.Parallel()
+
 	good := trade(1001, inzhur.TypePurchase, reit, "2026-01-05T02:34:38Z", 500, 10, 11.6178, 11618)
 
 	noContract := good
@@ -238,6 +250,8 @@ func TestMapErrors(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			result, err := Map([]inzhur.Transaction{good, tt.tx}, options())
 			if err == nil {
 				t.Fatal("Map() error = nil, want an error")
@@ -253,6 +267,8 @@ func TestMapErrors(t *testing.T) {
 }
 
 func TestMapRejectsAmbiguousDividendTax(t *testing.T) {
+	t.Parallel()
+
 	transactions := []inzhur.Transaction{
 		cash(1003, inzhur.TypeDividendTax, reit, "2026-01-10T22:19:01Z", 180),
 		cash(1002, inzhur.TypeDividendCrediting, reit, "2026-01-10T22:19:02Z", 1000),
@@ -266,6 +282,8 @@ func TestMapRejectsAmbiguousDividendTax(t *testing.T) {
 }
 
 func TestMapReportsAllProblems(t *testing.T) {
+	t.Parallel()
+
 	transactions := []inzhur.Transaction{
 		cash(2000, "Bonus crediting", reit, "2026-01-05T00:00:00Z", 100),
 		cash(2001, "Other", reit, "2026-01-05T00:00:00Z", 100),
@@ -283,12 +301,16 @@ func TestMapReportsAllProblems(t *testing.T) {
 }
 
 func TestMapRequiresAccountID(t *testing.T) {
+	t.Parallel()
+
 	if _, err := Map(nil, Options{Now: now}); err == nil {
 		t.Fatal("Map() error = nil, want an error")
 	}
 }
 
 func TestSymbol(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		asset inzhur.Asset
 		want  string
@@ -303,6 +325,8 @@ func TestSymbol(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.want, func(t *testing.T) {
+			t.Parallel()
+
 			got, err := Symbol(tt.asset, nil)
 			if err != nil {
 				t.Fatalf("Symbol(%+v) error = %v", tt.asset, err)
