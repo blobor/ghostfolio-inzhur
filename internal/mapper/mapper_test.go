@@ -302,14 +302,15 @@ func TestSymbol(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		got, err := Symbol(tt.asset, nil)
-		if err != nil {
-			t.Errorf("Symbol(%+v) error = %v", tt.asset, err)
-			continue
-		}
-		if got != tt.want {
-			t.Errorf("Symbol(%+v) = %q, want %q", tt.asset, got, tt.want)
-		}
+		t.Run(tt.want, func(t *testing.T) {
+			got, err := Symbol(tt.asset, nil)
+			if err != nil {
+				t.Fatalf("Symbol(%+v) error = %v", tt.asset, err)
+			}
+			if got != tt.want {
+				t.Errorf("Symbol(%+v) = %q, want %q", tt.asset, got, tt.want)
+			}
+		})
 	}
 
 	if _, err := Symbol(inzhur.Asset{ID: 60, Type: "stock", Name: "X"}, nil); err == nil {

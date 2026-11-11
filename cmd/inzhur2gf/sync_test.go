@@ -155,7 +155,7 @@ func TestSync(t *testing.T) {
 	f := baseFakes()
 	s, log := newSyncer(f, false)
 
-	if err := s.run(context.Background()); err != nil {
+	if err := s.run(t.Context()); err != nil {
 		t.Fatalf("run() error = %v", err)
 	}
 
@@ -193,7 +193,7 @@ func afterFirstSync(t *testing.T) *fakes {
 
 	f := baseFakes()
 	s, _ := newSyncer(f, false)
-	if err := s.run(context.Background()); err != nil {
+	if err := s.run(t.Context()); err != nil {
 		t.Fatalf("first run() error = %v", err)
 	}
 	for i, a := range f.imported {
@@ -217,7 +217,7 @@ func TestSyncCreatesOnlyTransactionsThatGhostfolioDoesNotHave(t *testing.T) {
 	f.stored = f.stored[:1]
 
 	s, log := newSyncer(f, false)
-	if err := s.run(context.Background()); err != nil {
+	if err := s.run(t.Context()); err != nil {
 		t.Fatalf("run() error = %v", err)
 	}
 
@@ -238,7 +238,7 @@ func TestSyncUpdatesATransactionThatInzhurChanged(t *testing.T) {
 	f.transactions[0].CreatedAt = moved
 
 	s, log := newSyncer(f, false)
-	if err := s.run(context.Background()); err != nil {
+	if err := s.run(t.Context()); err != nil {
 		t.Fatalf("run() error = %v", err)
 	}
 
@@ -260,7 +260,7 @@ func TestSyncDryRunDoesNotUpdate(t *testing.T) {
 	f.transactions[0].CreatedAt = f.transactions[0].CreatedAt.Add(19 * time.Hour)
 
 	s, log := newSyncer(f, true)
-	if err := s.run(context.Background()); err != nil {
+	if err := s.run(t.Context()); err != nil {
 		t.Fatalf("run() error = %v", err)
 	}
 
@@ -278,7 +278,7 @@ func TestSyncDoesNotUpdateWhenGhostfolioHasTwoActivitiesForOneTransaction(t *tes
 	f.stored = append(f.stored, moved)
 
 	s, log := newSyncer(f, false)
-	if err := s.run(context.Background()); err != nil {
+	if err := s.run(t.Context()); err != nil {
 		t.Fatalf("run() error = %v", err)
 	}
 
@@ -298,7 +298,7 @@ func TestSyncWarnsAboutAnActivityThatInzhurDoesNotHave(t *testing.T) {
 	f.stored = append(f.stored, gone, manual)
 
 	s, log := newSyncer(f, false)
-	if err := s.run(context.Background()); err != nil {
+	if err := s.run(t.Context()); err != nil {
 		t.Fatalf("run() error = %v", err)
 	}
 
@@ -316,7 +316,7 @@ func TestSyncUsesStoredToken(t *testing.T) {
 	f.storedToken = "stored"
 	s, _ := newSyncer(f, false)
 
-	if err := s.run(context.Background()); err != nil {
+	if err := s.run(t.Context()); err != nil {
 		t.Fatalf("run() error = %v", err)
 	}
 	if !slices.Contains(f.calls, "refresh:stored") || f.storedToken != "stored+1" {
@@ -328,7 +328,7 @@ func TestSyncDryRun(t *testing.T) {
 	f := baseFakes()
 	s, log := newSyncer(f, true)
 
-	if err := s.run(context.Background()); err != nil {
+	if err := s.run(t.Context()); err != nil {
 		t.Fatalf("run() error = %v", err)
 	}
 	if !f.importDryRun {
@@ -351,7 +351,7 @@ func TestSyncDryRunWarnsWhenTheHistoryIsNotComplete(t *testing.T) {
 	f.holdings[0].Quantity = 20
 	s, log := newSyncer(f, true)
 
-	if err := s.run(context.Background()); err != nil {
+	if err := s.run(t.Context()); err != nil {
 		t.Fatalf("run() error = %v", err)
 	}
 	for _, want := range []string{"level=WARN", "symbol=GF_INZHUR-REIT", "inzhur=20", "activities=15"} {
@@ -374,7 +374,7 @@ func TestSyncWarnsWhenASoldAssetHasAQuantity(t *testing.T) {
 	})
 	s, log := newSyncer(f, true)
 
-	if err := s.run(context.Background()); err != nil {
+	if err := s.run(t.Context()); err != nil {
 		t.Fatalf("run() error = %v", err)
 	}
 	for _, want := range []string{"level=WARN", "symbol=GF_UA4000238976", "inzhur=0", "activities=2"} {
@@ -389,7 +389,7 @@ func TestSyncStopsWhenSessionIsExpired(t *testing.T) {
 	f.refreshErr = inzhur.ErrSessionExpired
 	s, _ := newSyncer(f, false)
 
-	err := s.run(context.Background())
+	err := s.run(t.Context())
 	if !errors.Is(err, inzhur.ErrSessionExpired) {
 		t.Fatalf("run() error = %v, want ErrSessionExpired", err)
 	}
@@ -406,7 +406,7 @@ func TestSyncImportsNothingWhenAProfileIsMissing(t *testing.T) {
 	f.missingSymbols = []string{"GF_INZHUR-REIT"}
 	s, _ := newSyncer(f, false)
 
-	err := s.run(context.Background())
+	err := s.run(t.Context())
 	if err == nil || !strings.Contains(err.Error(), "GF_INZHUR-REIT") {
 		t.Fatalf("run() error = %v, want an error that names GF_INZHUR-REIT", err)
 	}
@@ -422,7 +422,7 @@ func TestSyncImportsNothingWhenATransactionIsNotKnown(t *testing.T) {
 	})
 	s, _ := newSyncer(f, false)
 
-	err := s.run(context.Background())
+	err := s.run(t.Context())
 	if err == nil || !strings.Contains(err.Error(), "transaction 2000") {
 		t.Fatalf("run() error = %v, want an error that names transaction 2000", err)
 	}
@@ -436,7 +436,7 @@ func TestSyncDoesNotCompareWhenTransactionsArePending(t *testing.T) {
 	f.transactions = append(f.transactions, reitPurchase(1003, syncTime.Add(-10*time.Minute), 1))
 	s, log := newSyncer(f, false)
 
-	if err := s.run(context.Background()); err != nil {
+	if err := s.run(t.Context()); err != nil {
 		t.Fatalf("run() error = %v", err)
 	}
 	if len(f.imported) != 2 {
@@ -455,7 +455,7 @@ func TestSyncWarnsWhenQuantitiesAreDifferent(t *testing.T) {
 	f.gfHoldings[0].Quantity = 14
 	s, log := newSyncer(f, false)
 
-	if err := s.run(context.Background()); err != nil {
+	if err := s.run(t.Context()); err != nil {
 		t.Fatalf("run() error = %v", err)
 	}
 	for _, want := range []string{"level=WARN", "quantity is different", "symbol=GF_INZHUR-REIT", "inzhur=15", "ghostfolio=14"} {

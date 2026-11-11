@@ -77,7 +77,8 @@ func NewClient(baseURL, securityToken string, opts ...Option) (*Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("ghostfolio: base URL: %w", err)
 	}
-	if (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+	isHTTP := u.Scheme == "http" || u.Scheme == "https"
+	if !isHTTP || u.Host == "" {
 		return nil, fmt.Errorf("ghostfolio: base URL %q must be an http or https address", baseURL)
 	}
 	if securityToken == "" {
@@ -298,8 +299,7 @@ func (c *Client) HasSymbol(ctx context.Context, dataSource, symbol string) (bool
 
 	err := c.call(ctx, http.MethodGet, path, nil, nil)
 
-	var statusErr *StatusError
-	if errors.As(err, &statusErr) && statusErr.Status == http.StatusNotFound {
+	if statusErr, ok := errors.AsType[*StatusError](err); ok && statusErr.Status == http.StatusNotFound {
 		return false, nil
 	}
 	if err != nil {
@@ -319,8 +319,9 @@ func (c *Client) call(ctx context.Context, method, path string, in, out any) err
 
 		err = c.do(ctx, method, path, token, in, out)
 
-		var statusErr *StatusError
-		if attempt == 0 && errors.As(err, &statusErr) && statusErr.Status == http.StatusUnauthorized {
+		statusErr, ok := errors.AsType[*StatusError](err)
+		isRejected := ok && statusErr.Status == http.StatusUnauthorized
+		if attempt == 0 && isRejected {
 			c.forget(token)
 			continue
 		}
@@ -347,10 +348,11 @@ func (c *Client) login(ctx context.Context) (string, error) {
 	}
 	err := c.do(ctx, http.MethodPost, "/api/v1/auth/anonymous", "", request, &response)
 
-	var statusErr *StatusError
-	if errors.As(err, &statusErr) &&
-		(statusErr.Status == http.StatusForbidden || statusErr.Status == http.StatusUnauthorized) {
-		return "", ErrUnauthorized
+	if statusErr, ok := errors.AsType[*StatusError](err); ok {
+		isRejected := statusErr.Status == http.StatusForbidden || statusErr.Status == http.StatusUnauthorized
+		if isRejected {
+			return "", ErrUnauthorized
+		}
 	}
 	if err != nil {
 		return "", err

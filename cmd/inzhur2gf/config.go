@@ -107,7 +107,7 @@ func parseBaseURL(raw string) (*url.URL, error) {
 func parseSymbolMap(raw string) (map[int]string, error) {
 	symbols := make(map[int]string)
 
-	for _, pair := range strings.Split(raw, ",") {
+	for pair := range strings.SplitSeq(raw, ",") {
 		pair = strings.TrimSpace(pair)
 		if pair == "" {
 			continue

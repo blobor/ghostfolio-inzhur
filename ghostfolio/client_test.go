@@ -1,7 +1,6 @@
 package ghostfolio
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -106,7 +105,7 @@ func TestImport(t *testing.T) {
 	})
 	_, client := newFakeServer(t, mux)
 
-	result, err := client.Import(context.Background(), testActivities(), false)
+	result, err := client.Import(t.Context(), testActivities(), false)
 	if err != nil {
 		t.Fatalf("Import() error = %v", err)
 	}
@@ -125,7 +124,7 @@ func TestImportDryRun(t *testing.T) {
 	})
 	_, client := newFakeServer(t, mux)
 
-	result, err := client.Import(context.Background(), testActivities(), true)
+	result, err := client.Import(t.Context(), testActivities(), true)
 	if err != nil {
 		t.Fatalf("Import() error = %v", err)
 	}
@@ -142,7 +141,7 @@ func TestImportOfOnlyDuplicatesReturnsNoActivities(t *testing.T) {
 	})
 	_, client := newFakeServer(t, mux)
 
-	result, err := client.Import(context.Background(), testActivities(), false)
+	result, err := client.Import(t.Context(), testActivities(), false)
 	if err != nil {
 		t.Fatalf("Import() error = %v", err)
 	}
@@ -158,7 +157,7 @@ func TestDryRunMustReturnAllActivities(t *testing.T) {
 	})
 	_, client := newFakeServer(t, mux)
 
-	_, err := client.Import(context.Background(), testActivities(), true)
+	_, err := client.Import(t.Context(), testActivities(), true)
 	if err == nil || !strings.Contains(err.Error(), "dry run returned 1 activities, want 2") {
 		t.Fatalf("Import() error = %v, want an error about the number of activities", err)
 	}
@@ -167,7 +166,7 @@ func TestDryRunMustReturnAllActivities(t *testing.T) {
 func TestImportWithoutActivitiesDoesNoRequest(t *testing.T) {
 	fake, client := newFakeServer(t, http.NewServeMux())
 
-	if _, err := client.Import(context.Background(), nil, false); err != nil {
+	if _, err := client.Import(t.Context(), nil, false); err != nil {
 		t.Fatalf("Import() error = %v", err)
 	}
 	if got := fake.logins.Load(); got != 0 {
@@ -201,7 +200,7 @@ func TestImportErrors(t *testing.T) {
 			})
 			_, client := newFakeServer(t, mux)
 
-			_, err := client.Import(context.Background(), testActivities(), false)
+			_, err := client.Import(t.Context(), testActivities(), false)
 			if err == nil || !strings.Contains(err.Error(), tt.want) {
 				t.Fatalf("Import() error = %v, want it to contain %q", err, tt.want)
 			}
@@ -257,7 +256,7 @@ func TestActivitiesReadsAllPages(t *testing.T) {
 	})
 	_, client := newFakeServer(t, mux)
 
-	got, err := client.Activities(context.Background(), "account-1")
+	got, err := client.Activities(t.Context(), "account-1")
 	if err != nil {
 		t.Fatalf("Activities() error = %v", err)
 	}
@@ -292,7 +291,7 @@ func TestActivitiesOfAnEmptyAccount(t *testing.T) {
 	})
 	_, client := newFakeServer(t, mux)
 
-	got, err := client.Activities(context.Background(), "account-1")
+	got, err := client.Activities(t.Context(), "account-1")
 	if err != nil || len(got) != 0 {
 		t.Fatalf("Activities() = %v, %v; want no activities and no error", got, err)
 	}
@@ -321,7 +320,7 @@ func TestUpdate(t *testing.T) {
 		Type:       TypeBuy,
 		UnitPrice:  11.6178,
 	}
-	if err := client.Update(context.Background(), "id-1", activity); err != nil {
+	if err := client.Update(t.Context(), "id-1", activity); err != nil {
 		t.Fatalf("Update() error = %v", err)
 	}
 
@@ -346,12 +345,12 @@ func TestUpdate(t *testing.T) {
 func TestUpdateOfAMissingActivityIsAnError(t *testing.T) {
 	_, client := newFakeServer(t, http.NewServeMux())
 
-	err := client.Update(context.Background(), "id-missing", Activity{})
+	err := client.Update(t.Context(), "id-missing", Activity{})
 
 	if statusErr, ok := errors.AsType[*StatusError](err); !ok || statusErr.Status != http.StatusNotFound {
 		t.Errorf("Update() error = %v, want status 404", err)
 	}
-	if err := client.Update(context.Background(), "", Activity{}); err == nil {
+	if err := client.Update(t.Context(), "", Activity{}); err == nil {
 		t.Error("Update() with an empty ID: no error")
 	}
 }
@@ -370,7 +369,7 @@ func TestHoldings(t *testing.T) {
 	})
 	_, client := newFakeServer(t, mux)
 
-	got, err := client.Holdings(context.Background())
+	got, err := client.Holdings(t.Context())
 	if err != nil {
 		t.Fatalf("Holdings() error = %v", err)
 	}
@@ -398,7 +397,7 @@ func TestHoldingsRejectsAHoldingWithoutSymbol(t *testing.T) {
 	})
 	_, client := newFakeServer(t, mux)
 
-	if _, err := client.Holdings(context.Background()); err == nil {
+	if _, err := client.Holdings(t.Context()); err == nil {
 		t.Fatal("Holdings() error = nil, want an error")
 	}
 }
@@ -423,13 +422,15 @@ func TestHasSymbol(t *testing.T) {
 		{symbol: "GF_BROKEN", wantErr: true},
 	}
 	for _, tt := range tests {
-		got, err := client.HasSymbol(context.Background(), DataSourceManual, tt.symbol)
-		if (err != nil) != tt.wantErr {
-			t.Errorf("HasSymbol(%s) error = %v, wantErr %v", tt.symbol, err, tt.wantErr)
-		}
-		if got != tt.want {
-			t.Errorf("HasSymbol(%s) = %v, want %v", tt.symbol, got, tt.want)
-		}
+		t.Run(tt.symbol, func(t *testing.T) {
+			got, err := client.HasSymbol(t.Context(), DataSourceManual, tt.symbol)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("HasSymbol() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if got != tt.want {
+				t.Errorf("HasSymbol() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }
 
@@ -441,7 +442,7 @@ func TestLoginIsDoneOneTime(t *testing.T) {
 	fake, client := newFakeServer(t, mux)
 
 	for range 3 {
-		if _, err := client.Holdings(context.Background()); err != nil {
+		if _, err := client.Holdings(t.Context()); err != nil {
 			t.Fatalf("Holdings() error = %v", err)
 		}
 	}
@@ -462,7 +463,7 @@ func TestLoginIsDoneAgainAfterUnauthorized(t *testing.T) {
 	})
 	fake, client := newFakeServer(t, mux)
 
-	if _, err := client.Holdings(context.Background()); err != nil {
+	if _, err := client.Holdings(t.Context()); err != nil {
 		t.Fatalf("Holdings() error = %v", err)
 	}
 	if got := fake.logins.Load(); got != 2 {
@@ -477,10 +478,9 @@ func TestUnauthorizedTwoTimesIsAnError(t *testing.T) {
 	})
 	fake, client := newFakeServer(t, mux)
 
-	_, err := client.Holdings(context.Background())
+	_, err := client.Holdings(t.Context())
 
-	var statusErr *StatusError
-	if !errors.As(err, &statusErr) || statusErr.Status != http.StatusUnauthorized {
+	if statusErr, ok := errors.AsType[*StatusError](err); !ok || statusErr.Status != http.StatusUnauthorized {
 		t.Fatalf("Holdings() error = %v, want a StatusError with status 401", err)
 	}
 	if got := fake.logins.Load(); got != 2 {
@@ -501,7 +501,7 @@ func TestBadSecurityToken(t *testing.T) {
 		t.Fatalf("NewClient() error = %v", err)
 	}
 
-	_, err = client.Holdings(context.Background())
+	_, err = client.Holdings(t.Context())
 	if !errors.Is(err, ErrUnauthorized) {
 		t.Fatalf("Holdings() error = %v, want ErrUnauthorized", err)
 	}

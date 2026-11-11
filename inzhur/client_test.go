@@ -66,7 +66,7 @@ func TestRefresh(t *testing.T) {
 	})
 	client := newTestClient(t, mux)
 
-	session, err := client.Refresh(context.Background(), "old-refresh")
+	session, err := client.Refresh(t.Context(), "old-refresh")
 	if err != nil {
 		t.Fatalf("Refresh() error = %v", err)
 	}
@@ -84,7 +84,7 @@ func TestRefreshKeepsTokenIfThereIsNoNewCookie(t *testing.T) {
 	})
 	client := newTestClient(t, mux)
 
-	session, err := client.Refresh(context.Background(), "old-refresh")
+	session, err := client.Refresh(t.Context(), "old-refresh")
 	if err != nil {
 		t.Fatalf("Refresh() error = %v", err)
 	}
@@ -117,7 +117,7 @@ func TestRefreshErrors(t *testing.T) {
 			})
 			client := newTestClient(t, mux)
 
-			_, err := client.Refresh(context.Background(), "old-refresh")
+			_, err := client.Refresh(t.Context(), "old-refresh")
 			if err == nil {
 				t.Fatal("Refresh() error = nil, want an error")
 			}
@@ -125,8 +125,7 @@ func TestRefreshErrors(t *testing.T) {
 				t.Errorf("errors.Is(err, ErrSessionExpired) = %v, want %v (err = %v)", got, tt.wantExpired, err)
 			}
 			if tt.wantStatus != 0 {
-				var statusErr *StatusError
-				if !errors.As(err, &statusErr) || statusErr.Status != tt.wantStatus {
+				if statusErr, ok := errors.AsType[*StatusError](err); !ok || statusErr.Status != tt.wantStatus {
 					t.Errorf("error = %v, want a StatusError with status %d", err, tt.wantStatus)
 				}
 			}
@@ -137,7 +136,7 @@ func TestRefreshErrors(t *testing.T) {
 func TestRefreshRejectsEmptyToken(t *testing.T) {
 	client := newTestClient(t, http.NewServeMux())
 
-	if _, err := client.Refresh(context.Background(), ""); err == nil {
+	if _, err := client.Refresh(t.Context(), ""); err == nil {
 		t.Fatal("Refresh() error = nil, want an error")
 	}
 }
@@ -158,7 +157,7 @@ func TestTransactions(t *testing.T) {
 	})
 	client := newTestClient(t, mux)
 
-	got, err := client.Transactions(context.Background(), "access-1")
+	got, err := client.Transactions(t.Context(), "access-1")
 	if err != nil {
 		t.Fatalf("Transactions() error = %v", err)
 	}
@@ -205,7 +204,7 @@ func TestHoldings(t *testing.T) {
 	})
 	client := newTestClient(t, mux)
 
-	got, err := client.Holdings(context.Background(), "access-1")
+	got, err := client.Holdings(t.Context(), "access-1")
 	if err != nil {
 		t.Fatalf("Holdings() error = %v", err)
 	}
@@ -233,7 +232,7 @@ func TestGetErrors(t *testing.T) {
 		})
 		client := newTestClient(t, mux)
 
-		if _, err := client.Transactions(context.Background(), "access-1"); !errors.Is(err, ErrSessionExpired) {
+		if _, err := client.Transactions(t.Context(), "access-1"); !errors.Is(err, ErrSessionExpired) {
 			t.Fatalf("Transactions() error = %v, want ErrSessionExpired", err)
 		}
 	})
@@ -246,10 +245,10 @@ func TestGetErrors(t *testing.T) {
 		})
 		client := newTestClient(t, mux)
 
-		_, err := client.Transactions(context.Background(), "access-1")
+		_, err := client.Transactions(t.Context(), "access-1")
 
-		var statusErr *StatusError
-		if !errors.As(err, &statusErr) {
+		statusErr, ok := errors.AsType[*StatusError](err)
+		if !ok {
 			t.Fatalf("Transactions() error = %v, want a StatusError", err)
 		}
 		if statusErr.Path != "/users/transactions" || statusErr.Status != http.StatusInternalServerError {
@@ -263,7 +262,7 @@ func TestGetErrors(t *testing.T) {
 	t.Run("empty access token", func(t *testing.T) {
 		client := newTestClient(t, http.NewServeMux())
 
-		if _, err := client.Holdings(context.Background(), ""); err == nil {
+		if _, err := client.Holdings(t.Context(), ""); err == nil {
 			t.Fatal("Holdings() error = nil, want an error")
 		}
 	})
@@ -275,7 +274,7 @@ func TestGetErrors(t *testing.T) {
 		})
 		client := newTestClient(t, mux)
 
-		ctx, cancel := context.WithCancel(context.Background())
+		ctx, cancel := context.WithCancel(t.Context())
 		cancel()
 
 		if _, err := client.Holdings(ctx, "access-1"); !errors.Is(err, context.Canceled) {
@@ -294,8 +293,8 @@ func TestErrorsDoNotContainTokens(t *testing.T) {
 	})
 	client := newTestClient(t, mux)
 
-	_, refreshErr := client.Refresh(context.Background(), "secret-refresh")
-	_, getErr := client.Holdings(context.Background(), "secret-access")
+	_, refreshErr := client.Refresh(t.Context(), "secret-refresh")
+	_, getErr := client.Holdings(t.Context(), "secret-access")
 
 	for _, err := range []error{refreshErr, getErr} {
 		if err == nil {

@@ -204,7 +204,8 @@ func addSaleTax(entries []*entry, tax inzhur.Transaction) error {
 	}
 
 	for _, e := range entries {
-		if e.tx.Type == inzhur.TypeSale && e.tx.Contract != nil && e.tx.Contract.ID == tax.Contract.ID {
+		isSale := e.tx.Type == inzhur.TypeSale && e.tx.Contract != nil
+		if isSale && e.tx.Contract.ID == tax.Contract.ID {
 			e.add(tax)
 			return nil
 		}
@@ -226,7 +227,8 @@ func addDividendTax(entries []*entry, tax inzhur.Transaction) error {
 		tie      bool
 	)
 	for _, e := range entries {
-		if e.tx.Type != inzhur.TypeDividendCrediting || e.hasTax || e.tx.Asset.ID != tax.Asset.ID {
+		isCandidate := e.tx.Type == inzhur.TypeDividendCrediting && !e.hasTax && e.tx.Asset.ID == tax.Asset.ID
+		if !isCandidate {
 			continue
 		}
 		diff := tax.CreatedAt.Sub(e.tx.CreatedAt).Abs()
