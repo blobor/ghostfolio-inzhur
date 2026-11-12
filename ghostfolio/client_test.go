@@ -377,57 +377,6 @@ func TestUpdateOfAMissingActivityIsAnError(t *testing.T) {
 	}
 }
 
-func TestHoldings(t *testing.T) {
-	t.Parallel()
-
-	mux := http.NewServeMux()
-	mux.HandleFunc("GET /api/v1/portfolio/holdings", func(w http.ResponseWriter, r *http.Request) {
-		if got := r.Header.Get("Authorization"); got != "Bearer auth-1" {
-			t.Errorf("Authorization header = %q, want Bearer auth-1", got)
-		}
-		_, _ = w.Write([]byte(`{"holdings":[
-			{"quantity":10,"activitiesCount":2,"assetProfile":{"symbol":"GF_INZHUR-REIT","dataSource":"MANUAL","currency":"UAH"}},
-			{"quantity":0,"activitiesCount":5,"assetProfile":{"symbol":"GF_UA4000239016","dataSource":"MANUAL"}},
-			{"quantity":1.5,"assetProfile":{"symbol":"VWCE.DE","dataSource":"YAHOO"}}
-		]}`))
-	})
-	_, client := newFakeServer(t, mux)
-
-	got, err := client.Holdings(t.Context())
-	if err != nil {
-		t.Fatalf("Holdings() error = %v", err)
-	}
-
-	want := []Holding{
-		{Symbol: "GF_INZHUR-REIT", DataSource: "MANUAL", Quantity: 10},
-		{Symbol: "GF_UA4000239016", DataSource: "MANUAL", Quantity: 0},
-		{Symbol: "VWCE.DE", DataSource: "YAHOO", Quantity: 1.5},
-	}
-	if len(got) != len(want) {
-		t.Fatalf("Holdings() returned %d records, want %d", len(got), len(want))
-	}
-	for i := range want {
-		if got[i] != want[i] {
-			t.Errorf("Holdings()[%d] = %+v, want %+v", i, got[i], want[i])
-		}
-	}
-}
-
-func TestHoldingsRejectsAHoldingWithoutSymbol(t *testing.T) {
-	t.Parallel()
-
-	mux := http.NewServeMux()
-	mux.HandleFunc("GET /api/v1/portfolio/holdings", func(w http.ResponseWriter, _ *http.Request) {
-		// This is the format of an older Ghostfolio version.
-		_, _ = w.Write([]byte(`{"holdings":[{"symbol":"GF_INZHUR-REIT","dataSource":"MANUAL","quantity":10}]}`))
-	})
-	_, client := newFakeServer(t, mux)
-
-	if _, err := client.Holdings(t.Context()); err == nil {
-		t.Fatal("Holdings() error = nil, want an error")
-	}
-}
-
 func TestHasSymbol(t *testing.T) {
 	t.Parallel()
 
@@ -468,14 +417,17 @@ func TestLoginIsDoneOneTime(t *testing.T) {
 	t.Parallel()
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /api/v1/portfolio/holdings", func(w http.ResponseWriter, _ *http.Request) {
-		_, _ = w.Write([]byte(`{"holdings":[]}`))
+	mux.HandleFunc("GET /api/v1/symbol/MANUAL/GF_INZHUR-REIT", func(w http.ResponseWriter, r *http.Request) {
+		if got := r.Header.Get("Authorization"); got != "Bearer auth-1" {
+			t.Errorf("Authorization header = %q, want Bearer auth-1", got)
+		}
+		_, _ = w.Write([]byte(`{}`))
 	})
 	fake, client := newFakeServer(t, mux)
 
 	for range 3 {
-		if _, err := client.Holdings(t.Context()); err != nil {
-			t.Fatalf("Holdings() error = %v", err)
+		if _, err := client.HasSymbol(t.Context(), DataSourceManual, "GF_INZHUR-REIT"); err != nil {
+			t.Fatalf("HasSymbol() error = %v", err)
 		}
 	}
 	if got := fake.logins.Load(); got != 1 {
@@ -488,17 +440,17 @@ func TestLoginIsDoneAgainAfterUnauthorized(t *testing.T) {
 
 	var calls atomic.Int32
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /api/v1/portfolio/holdings", func(w http.ResponseWriter, _ *http.Request) {
+	mux.HandleFunc("GET /api/v1/symbol/MANUAL/GF_INZHUR-REIT", func(w http.ResponseWriter, _ *http.Request) {
 		if calls.Add(1) == 1 {
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}
-		_, _ = w.Write([]byte(`{"holdings":[]}`))
+		_, _ = w.Write([]byte(`{}`))
 	})
 	fake, client := newFakeServer(t, mux)
 
-	if _, err := client.Holdings(t.Context()); err != nil {
-		t.Fatalf("Holdings() error = %v", err)
+	if _, err := client.HasSymbol(t.Context(), DataSourceManual, "GF_INZHUR-REIT"); err != nil {
+		t.Fatalf("HasSymbol() error = %v", err)
 	}
 	if got := fake.logins.Load(); got != 2 {
 		t.Errorf("logins = %d, want 2", got)
@@ -509,15 +461,15 @@ func TestUnauthorizedTwoTimesIsAnError(t *testing.T) {
 	t.Parallel()
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /api/v1/portfolio/holdings", func(w http.ResponseWriter, _ *http.Request) {
+	mux.HandleFunc("GET /api/v1/symbol/MANUAL/GF_INZHUR-REIT", func(w http.ResponseWriter, _ *http.Request) {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 	})
 	fake, client := newFakeServer(t, mux)
 
-	_, err := client.Holdings(t.Context())
+	_, err := client.HasSymbol(t.Context(), DataSourceManual, "GF_INZHUR-REIT")
 
 	if statusErr, ok := errors.AsType[*StatusError](err); !ok || statusErr.Status != http.StatusUnauthorized {
-		t.Fatalf("Holdings() error = %v, want a StatusError with status 401", err)
+		t.Fatalf("HasSymbol() error = %v, want a StatusError with status 401", err)
 	}
 	if got := fake.logins.Load(); got != 2 {
 		t.Errorf("logins = %d, want 2", got)
@@ -539,9 +491,9 @@ func TestBadSecurityToken(t *testing.T) {
 		t.Fatalf("NewClient() error = %v", err)
 	}
 
-	_, err = client.Holdings(t.Context())
+	_, err = client.HasSymbol(t.Context(), DataSourceManual, "GF_INZHUR-REIT")
 	if !errors.Is(err, ErrUnauthorized) {
-		t.Fatalf("Holdings() error = %v, want ErrUnauthorized", err)
+		t.Fatalf("HasSymbol() error = %v, want ErrUnauthorized", err)
 	}
 	if strings.Contains(err.Error(), "bad-secret-token") {
 		t.Errorf("error contains the token: %v", err)

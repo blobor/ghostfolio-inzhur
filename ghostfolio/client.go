@@ -64,11 +64,6 @@ func WithHTTPClient(c *http.Client) Option {
 	return func(client *Client) { client.httpClient = c }
 }
 
-// WithUserAgent sets the User-Agent header.
-func WithUserAgent(userAgent string) Option {
-	return func(client *Client) { client.userAgent = userAgent }
-}
-
 // NewClient returns a Client for the Ghostfolio instance at baseURL, for
 // example "http://ghostfolio:3333". The security token is the token that
 // the user uses to log in to Ghostfolio.
@@ -251,43 +246,6 @@ func (c *Client) Update(ctx context.Context, id string, activity Activity) error
 	}{ID: id, Activity: activity}
 
 	return c.call(ctx, http.MethodPut, "/api/v1/activities/"+url.PathEscape(id), request, nil)
-}
-
-// Holding is the current position in one symbol.
-type Holding struct {
-	Symbol     string
-	DataSource string
-	Quantity   float64
-}
-
-// Holdings returns the current positions of the user, for all accounts.
-// A position that the user sold completely has the quantity 0.
-func (c *Client) Holdings(ctx context.Context) ([]Holding, error) {
-	var response struct {
-		Holdings []struct {
-			Quantity     float64 `json:"quantity"`
-			AssetProfile struct {
-				Symbol     string `json:"symbol"`
-				DataSource string `json:"dataSource"`
-			} `json:"assetProfile"`
-		} `json:"holdings"`
-	}
-	if err := c.call(ctx, http.MethodGet, "/api/v1/portfolio/holdings", nil, &response); err != nil {
-		return nil, err
-	}
-
-	holdings := make([]Holding, 0, len(response.Holdings))
-	for i, h := range response.Holdings {
-		if h.AssetProfile.Symbol == "" || h.AssetProfile.DataSource == "" {
-			return nil, fmt.Errorf("ghostfolio: holding %d has no symbol or data source", i)
-		}
-		holdings = append(holdings, Holding{
-			Symbol:     h.AssetProfile.Symbol,
-			DataSource: h.AssetProfile.DataSource,
-			Quantity:   h.Quantity,
-		})
-	}
-	return holdings, nil
 }
 
 // HasSymbol tells if Ghostfolio has an asset profile for the symbol.

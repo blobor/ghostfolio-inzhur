@@ -83,13 +83,6 @@ type Holding struct {
 	Type    AssetType
 	// Quantity is the number of units that the user owns.
 	Quantity float64
-	// SaleRestrictedQuantity is the part of Quantity that the user cannot
-	// sell at this time.
-	SaleRestrictedQuantity float64
-	// The prices are in UAH for one unit.
-	BuyPrice  float64
-	SellPrice float64
-	NAV       float64
 }
 
 // Session is the result of a refresh.

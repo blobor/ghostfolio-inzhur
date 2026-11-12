@@ -74,11 +74,6 @@ func WithBaseURLs(authURL, coreURL string) Option {
 	}
 }
 
-// WithUserAgent sets the User-Agent header.
-func WithUserAgent(userAgent string) Option {
-	return func(client *Client) { client.userAgent = userAgent }
-}
-
 // NewClient returns a Client.
 func NewClient(opts ...Option) *Client {
 	c := &Client{
@@ -167,16 +162,10 @@ func (c *Client) Transactions(ctx context.Context, accessToken string) ([]Transa
 func (c *Client) Holdings(ctx context.Context, accessToken string) ([]Holding, error) {
 	var body struct {
 		Assets []struct {
-			ID     int       `json:"id"`
-			Type   AssetType `json:"type"`
-			Prices struct {
-				BuyUAH  float64 `json:"buyUAH"`
-				SellUAH float64 `json:"sellUAH"`
-				NavUAH  float64 `json:"navUAH"`
-			} `json:"prices"`
+			ID      int       `json:"id"`
+			Type    AssetType `json:"type"`
 			Details struct {
-				Owned          float64 `json:"certificatesOwnedQuantity"`
-				SaleRestricted float64 `json:"certificatesSaleRestrictedQuantity"`
+				Owned float64 `json:"certificatesOwnedQuantity"`
 			} `json:"details"`
 		} `json:"assets"`
 	}
@@ -187,13 +176,9 @@ func (c *Client) Holdings(ctx context.Context, accessToken string) ([]Holding, e
 	holdings := make([]Holding, 0, len(body.Assets))
 	for _, a := range body.Assets {
 		holdings = append(holdings, Holding{
-			AssetID:                a.ID,
-			Type:                   a.Type,
-			Quantity:               a.Details.Owned,
-			SaleRestrictedQuantity: a.Details.SaleRestricted,
-			BuyPrice:               a.Prices.BuyUAH,
-			SellPrice:              a.Prices.SellUAH,
-			NAV:                    a.Prices.NavUAH,
+			AssetID:  a.ID,
+			Type:     a.Type,
+			Quantity: a.Details.Owned,
 		})
 	}
 	return holdings, nil

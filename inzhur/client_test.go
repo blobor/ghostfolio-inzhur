@@ -224,9 +224,8 @@ func TestHoldings(t *testing.T) {
 	}
 
 	want := []Holding{
-		{AssetID: 21, Type: AssetFund, Quantity: 10, SaleRestrictedQuantity: 3,
-			BuyPrice: 11.6468, SellPrice: 11.6178, NAV: 11.6178},
-		{AssetID: 36, Type: AssetBond, Quantity: 4, BuyPrice: 1022.47, SellPrice: 1022.47},
+		{AssetID: 21, Type: AssetFund, Quantity: 10},
+		{AssetID: 36, Type: AssetBond, Quantity: 4},
 	}
 	if len(got) != len(want) {
 		t.Fatalf("Holdings() returned %d records, want %d", len(got), len(want))
