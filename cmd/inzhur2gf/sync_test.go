@@ -33,7 +33,6 @@ type fakes struct {
 	imported       []ghostfolio.Activity
 	importDryRun   bool
 	updated        map[string]ghostfolio.Activity
-	gfHoldings     []ghostfolio.Holding
 }
 
 func (f *fakes) Token(startToken string) (string, state.Source, error) {
@@ -63,7 +62,7 @@ func (f *fakes) Transactions(_ context.Context, accessToken string) ([]inzhur.Tr
 	return f.transactions, nil
 }
 
-func (f *fakes) inzhurHoldings(_ context.Context, accessToken string) ([]inzhur.Holding, error) {
+func (f *fakes) Holdings(_ context.Context, accessToken string) ([]inzhur.Holding, error) {
 	f.calls = append(f.calls, "holdings:"+accessToken)
 	return f.holdings, nil
 }
@@ -82,6 +81,12 @@ func (f *fakes) Import(_ context.Context, activities []ghostfolio.Activity, dryR
 	f.calls = append(f.calls, "import")
 	f.imported = activities
 	f.importDryRun = dryRun
+	if !dryRun {
+		for _, a := range activities {
+			id := "gf-" + strconv.Itoa(len(f.stored)+1)
+			f.stored = append(f.stored, ghostfolio.StoredActivity{ID: id, Activity: a})
+		}
+	}
 	return ghostfolio.ImportResult{Imported: len(activities)}, nil
 }
 
@@ -91,26 +96,12 @@ func (f *fakes) Update(_ context.Context, id string, activity ghostfolio.Activit
 		f.updated = make(map[string]ghostfolio.Activity)
 	}
 	f.updated[id] = activity
+	for i := range f.stored {
+		if f.stored[i].ID == id {
+			f.stored[i].Activity = activity
+		}
+	}
 	return nil
-}
-
-func (f *fakes) ghostfolioHoldings(_ context.Context) ([]ghostfolio.Holding, error) {
-	f.calls = append(f.calls, "gf-holdings")
-	return f.gfHoldings, nil
-}
-
-// The two clients have a method with the name Holdings. These types give
-// each client its own method set.
-type fakeInzhur struct{ *fakes }
-
-func (f fakeInzhur) Holdings(ctx context.Context, accessToken string) ([]inzhur.Holding, error) {
-	return f.inzhurHoldings(ctx, accessToken)
-}
-
-type fakeGhostfolio struct{ *fakes }
-
-func (f fakeGhostfolio) Holdings(ctx context.Context) ([]ghostfolio.Holding, error) {
-	return f.ghostfolioHoldings(ctx)
 }
 
 func newSyncer(f *fakes, dryRun bool) (*syncer, *bytes.Buffer) {
@@ -122,8 +113,8 @@ func newSyncer(f *fakes, dryRun bool) (*syncer, *bytes.Buffer) {
 			DryRun:              dryRun,
 		},
 		logger:     slog.New(slog.NewTextHandler(&log, nil)),
-		inzhur:     fakeInzhur{f},
-		ghostfolio: fakeGhostfolio{f},
+		inzhur:     f,
+		ghostfolio: f,
 		store:      f,
 		now:        func() time.Time { return syncTime },
 	}, &log
@@ -146,8 +137,7 @@ func baseFakes() *fakes {
 			reitPurchase(1002, syncTime.Add(-48*time.Hour), 5),
 			reitPurchase(1001, syncTime.Add(-72*time.Hour), 10),
 		},
-		holdings:   []inzhur.Holding{{AssetID: 21, Type: inzhur.AssetFund, Quantity: 15}},
-		gfHoldings: []ghostfolio.Holding{{Symbol: "GF_INZHUR-REIT", DataSource: "MANUAL", Quantity: 15}},
+		holdings: []inzhur.Holding{{AssetID: 21, Type: inzhur.AssetFund, Quantity: 15}},
 	}
 }
 
@@ -170,7 +160,7 @@ func TestSync(t *testing.T) {
 		"activities:account-1",
 		"symbol:GF_INZHUR-REIT",
 		"import",
-		"gf-holdings",
+		"activities:account-1",
 	}
 	if !slices.Equal(f.calls, wantCalls) {
 		t.Errorf("calls:\n got %v\nwant %v", f.calls, wantCalls)
@@ -187,9 +177,8 @@ func TestSync(t *testing.T) {
 	}
 }
 
-// afterFirstSync does a sync into an empty account. Then it gives
-// Ghostfolio the activities of that sync, with the IDs gf-1, gf-2 and so
-// on.
+// afterFirstSync does a sync into an empty account. After it, Ghostfolio
+// has the activities of that sync, with the IDs gf-1, gf-2 and so on.
 func afterFirstSync(t *testing.T) *fakes {
 	t.Helper()
 
@@ -197,9 +186,6 @@ func afterFirstSync(t *testing.T) *fakes {
 	s, _ := newSyncer(f, false)
 	if err := s.run(t.Context()); err != nil {
 		t.Fatalf("first run() error = %v", err)
-	}
-	for i, a := range f.imported {
-		f.stored = append(f.stored, ghostfolio.StoredActivity{ID: "gf-" + strconv.Itoa(i+1), Activity: a})
 	}
 	f.calls, f.imported = nil, nil
 	return f
@@ -350,8 +336,8 @@ func TestSyncDryRun(t *testing.T) {
 	if !f.importDryRun {
 		t.Error("the import was not a dry run")
 	}
-	if slices.Contains(f.calls, "gf-holdings") {
-		t.Error("the dry run read the holdings of Ghostfolio")
+	if len(f.stored) != 0 {
+		t.Errorf("the dry run stored %d activities", len(f.stored))
 	}
 	if !strings.Contains(log.String(), "quantities are equal") || !strings.Contains(log.String(), "source=activities") {
 		t.Errorf("log does not report equal quantities from the activities:\n%s", log)
@@ -470,8 +456,8 @@ func TestSyncDoesNotCompareWhenTransactionsArePending(t *testing.T) {
 	if len(f.imported) != 2 {
 		t.Errorf("imported %d activities, want 2", len(f.imported))
 	}
-	if slices.Contains(f.calls, "gf-holdings") {
-		t.Error("the sync compared the quantities")
+	if strings.Contains(log.String(), "quantities are equal") || strings.Contains(log.String(), "quantity is different") {
+		t.Errorf("the sync compared the quantities:\n%s", log)
 	}
 	if !strings.Contains(log.String(), "pending=1") {
 		t.Errorf("log does not report the pending transaction:\n%s", log)
@@ -481,8 +467,11 @@ func TestSyncDoesNotCompareWhenTransactionsArePending(t *testing.T) {
 func TestSyncWarnsWhenQuantitiesAreDifferent(t *testing.T) {
 	t.Parallel()
 
-	f := baseFakes()
-	f.gfHoldings[0].Quantity = 14
+	f := afterFirstSync(t)
+	// The user sold one unit in Ghostfolio by hand.
+	sale := f.stored[0]
+	sale.ID, sale.Comment, sale.Type, sale.Quantity = "gf-9", "made by hand", ghostfolio.TypeSell, 1
+	f.stored = append(f.stored, sale)
 	s, log := newSyncer(f, false)
 
 	if err := s.run(t.Context()); err != nil {

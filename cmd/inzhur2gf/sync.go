@@ -40,7 +40,6 @@ type ghostfolioAPI interface {
 	HasSymbol(ctx context.Context, dataSource, symbol string) (bool, error)
 	Import(ctx context.Context, activities []ghostfolio.Activity, dryRun bool) (ghostfolio.ImportResult, error)
 	Update(ctx context.Context, id string, activity ghostfolio.Activity) error
-	Holdings(ctx context.Context) ([]ghostfolio.Holding, error)
 }
 
 // tokenStore keeps the refresh token between runs.
@@ -158,17 +157,20 @@ func (s *syncer) run(ctx context.Context) error {
 		// compare. Use the quantities that the activities give.
 		s.compare(transactions, holdings, quantities(result.Activities), "activities")
 	default:
-		gfHoldings, err := s.ghostfolio.Holdings(ctx)
-		if err != nil {
-			return fmt.Errorf("read ghostfolio holdings: %w", err)
-		}
-		inGhostfolio := make(map[string]float64)
-		for _, h := range gfHoldings {
-			if h.DataSource == ghostfolio.DataSourceManual {
-				inGhostfolio[h.Symbol] += h.Quantity
+		// Ghostfolio calculates its holdings some time after a change, thus
+		// they can be old. The activities of the account are always
+		// current.
+		if len(p.create) > 0 || len(p.update) > 0 {
+			stored, err = s.ghostfolio.Activities(ctx, s.cfg.GhostfolioAccountID)
+			if err != nil {
+				return fmt.Errorf("read ghostfolio activities: %w", err)
 			}
 		}
-		s.compare(transactions, holdings, inGhostfolio, "ghostfolio")
+		inGhostfolio := make([]ghostfolio.Activity, 0, len(stored))
+		for _, a := range stored {
+			inGhostfolio = append(inGhostfolio, a.Activity)
+		}
+		s.compare(transactions, holdings, quantities(inGhostfolio), "ghostfolio")
 	}
 	return nil
 }
