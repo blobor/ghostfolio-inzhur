@@ -45,8 +45,12 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       # main gives the tag "edge". A tag v1.2.3 gives 1.2.3, 1.2 and latest.
+      # GHCR reads the description of an image for more than one platform
+      # from the annotations of the index, not from the labels.
       - id: meta
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        env:
+          DOCKER_METADATA_ANNOTATIONS_LEVELS: manifest,index
         with:
           images: ${{ env.IMAGE }}
           tags: |
@@ -62,6 +66,7 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          annotations: ${{ steps.meta.outputs.annotations }}
           build-args: |
             VERSION=${{ steps.meta.outputs.version }}
           cache-from: type=gha
