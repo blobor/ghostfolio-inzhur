@@ -5,9 +5,9 @@ self-hosted [Ghostfolio](https://ghostfol.io).
 
 The binary is `inzhur2gf`. It does one sync and stops. A scheduler starts it again.
 
-> [!WARNING]
-> **Status: early version.** The sync is implemented, but it has no release yet.
-> Do the first sync with `DRY_RUN=true`.
+> [!TIP]
+> Do the first sync with `DRY_RUN=true`. The program then reports the changes, but
+> Ghostfolio stores nothing.
 
 ## Disclaimer
 
@@ -185,7 +185,7 @@ The image `ghcr.io/blobor/ghostfolio-inzhur` is for `linux/amd64` and `linux/arm
 It runs as a user that is not root. `DATA_DIR` is `/data` in the image.
 
 ```sh
-docker run --rm --env-file .env -v inzhur2gf-data:/data ghcr.io/blobor/ghostfolio-inzhur:edge
+docker run --rm --env-file .env -v inzhur2gf-data:/data ghcr.io/blobor/ghostfolio-inzhur:latest
 ```
 
 Do not set `DATA_DIR` in the `.env` file for the container. If you set it, the value must
